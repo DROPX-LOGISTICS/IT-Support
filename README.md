@@ -13,7 +13,11 @@ raise a ticket (screenshots, `?portal=&page=` prefill), my tickets, Gmail sender
 Phase 2: developer queue (priority, then oldest; filters and search), ticket page (status,
 assignee, priority, expected date, viability, update, links, comments, internal notes, history),
 reporter confirmation ("Yes, it works" closes; "Still not working" reopens with a reason),
-emails on raise and on confirmation request. Later phases: spec section 13.
+emails on raise and on confirmation request.
+Phase 3: Master (portals, repositories with path prefixes, developers and their GitHub identities,
+people and roles, unmatched commits), the daily job that drafts each developer's update from
+yesterday's commits, and the Daily updates page (review, edit hours, blocker and next step, publish).
+Later phases: spec section 13.
 
 ## Local setup
 
@@ -40,7 +44,8 @@ what is missing. Use a **development** Supabase project, never production.
 | `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET` | Email | Google OAuth client, see "Gmail sender" |
 | `GMAIL_REFRESH_TOKEN` | Email | Printed by `scripts/get-gmail-refresh-token.mjs` |
 | `MAIL_FROM` | Email | `tech@dropxlogistics.com` (display name defaults to "DropX IT Support"; `"Name" <address>` also works) |
-| `GITHUB_TOKEN`, `CRON_SECRET` | Phase 3 (daily updates) | Not used yet |
+| `GITHUB_TOKEN` | Daily updates | GitHub, Settings, Developer settings, Fine-grained token. Resource owner: each organisation/user that owns a listed repo (create one token per owner if needed); repositories: the listed ones; permissions: **Contents: read-only** and **Metadata: read-only**. Nothing else. Without it the page says "GitHub is not configured" and manual rows still work |
+| `CRON_SECRET` | Daily job | Any long random string (`openssl rand -hex 32`). On Vercel, set it as an environment variable: Vercel then sends it as `Authorization: Bearer <secret>` to the cron route |
 
 On Vercel add them under Project Settings, Environment Variables. Nothing secret is
 ever written to code, migrations or logs.
@@ -48,7 +53,7 @@ ever written to code, migrations or logs.
 ## Database
 
 Migrations live in `supabase/migrations/<UTC timestamp>_<n>.sql` and are safe to re-run.
-Apply `20261008120000_1.sql`, then `20261008130000_2.sql`, with the Supabase SQL editor, or `supabase db push` against
+Apply `20261008120000_1.sql`, `20261008130000_2.sql`, then `20261008140000_3.sql`, with the Supabase SQL editor, or `supabase db push` against
 the **development** project. It creates only objects prefixed `support_`: 11 tables,
 functions, triggers, policies and one private storage bucket (`support_attachments`).
 It seeds the six portal names (only People has a site URL) and one settings row.
@@ -103,6 +108,26 @@ drop function if exists support_add_comment(uuid,text,boolean), support_confirm_
 -- restore the phase 1 event_type check and events policy by re-running the matching parts of migration _1.
 ```
 
+### Phase 3 rollback (development only)
+
+```sql
+drop function if exists support_publish_daily_update(uuid);
+drop table if exists support_unmatched_commits cascade;
+drop index if exists support_daily_updates_draft_key;
+alter table support_daily_updates drop constraint if exists support_daily_updates_source_check;
+alter table support_daily_updates drop column if exists source;
+-- the replaced daily-updates policies and the event_type check are restored by re-running the matching parts of migrations _1 and _2.
+```
+
+## Daily updates: how it works
+
+- **Schedule:** `vercel.json` runs `/api/cron/daily-updates` at 03:30 UTC (09:00 IST) and drafts the previous IST day. The "daily update run time" in `support_settings` is not wired to the schedule yet; change `vercel.json` to move it. You can replay a day with `GET /api/cron/daily-updates?date=YYYY-MM-DD` and the bearer secret.
+- **Matching:** developer by GitHub login (also from `…@users.noreply.github.com`), then commit email, then commit name. Two developers matching, or none, means the commit goes to Master, Unmatched commits; nothing is guessed. Merge commits are skipped.
+- **Portal:** the portal whose path prefix matches most changed files; files that match no prefix go to the repository's portal with no prefixes; ties go to the lower sort order. Per-commit file lists are fetched only for repositories shared by several portals (max 200 per repository per run).
+- **Tickets:** `BUG-12`, `fr-7`, `SUP-0003` in a commit message link the commit to that ticket if it exists. A commit naming two tickets appears under both.
+- **Re-running** never duplicates (a unique index allows one open draft per day, developer, portal and ticket) and never overwrites edits: new commits are appended to the open draft; published rows are left alone and late commits start a new draft.
+- **Limits:** only commits on each repository's default branch are read, up to 1000 per repository per day.
+
 ## Access rules
 
 Reporters see only their own tickets. Developers, managers and admins see all; managers are
@@ -120,7 +145,9 @@ The service role bypasses row-level security. It is used in exactly these places
 3. `src/lib/notifications.ts`: read the ticket and the staff email addresses to send the raise and confirmation emails, and record `email_sent` / `email_failed` events (reporters cannot read staff addresses).
 4. `src/app/api/attachments/[id]/route.ts`: read a private file, only after the person's own session found the attachment row (row-level security is the access check).
 
-Status changes, assignment, comments and confirmation all run through database functions as the signed-in person (no service role).
+5. `src/app/api/cron/daily-updates/route.ts`: the scheduled job has no signed-in person; it is protected by `CRON_SECRET` (constant-time compare) and writes draft rows and unmatched commits. The manual "Draft from commits" button does **not** use the service role: it runs as the developer, so row-level security limits it to their own rows.
+
+Status changes, assignment, comments, confirmation and publishing a daily update all run through database functions as the signed-in person (no service role).
 
 ## Integration with other portals
 

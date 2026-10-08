@@ -13,7 +13,7 @@ export function AppHeader({ user }: { user: SessionUser }) {
           <BrandMark />
           IT Support
         </Link>
-        <NavLinks staff={user.role !== "reporter"} />
+        <NavLinks role={user.role} />
         <form action={signOut} className="who">
           <span className="avatar" aria-hidden>{initial}</span>
           <button className="linklike" type="submit">Sign out</button>

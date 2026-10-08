@@ -48,3 +48,15 @@ test("the status list matches the spec", () => {
     assert.ok(sql.includes(`'${s}'`), s);
   }
 });
+
+test("phase 3: duplicate-proof draft index, unmatched commits table, publish function", () => {
+  assert.match(sql, /create unique index if not exists support_daily_updates_draft_key[\s\S]*where source = 'commits' and state = 'draft'/);
+  assert.match(sql, /create table if not exists support_unmatched_commits/);
+  assert.ok(!/create policy support_unmatched_insert/.test(sql), "unmatched commits are written only by the job");
+  assert.match(sql, /create or replace function support_publish_daily_update/);
+  assert.match(sql, /'published'\)\s*;?\s*\n\s*end if;/);
+});
+test("phase 3: a published daily update never exposes its work text in ticket history", () => {
+  const m = sql.match(/'daily_update_published', '([^']*)'/);
+  assert.equal(m[1], "published");
+});

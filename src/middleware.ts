@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
-const PUBLIC = ["/login", "/auth/callback"];
+// /api/cron checks its own secret; it has no signed-in person.
+const PUBLIC = ["/login", "/auth/callback", "/api/cron"];
 
 export async function middleware(request: NextRequest) {
   const url = process.env.SUPABASE_URL?.trim();

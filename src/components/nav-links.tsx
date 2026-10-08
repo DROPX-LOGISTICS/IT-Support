@@ -7,9 +7,15 @@ const LINKS = [
   { href: "/my-tickets", label: "My tickets" },
 ];
 
-export function NavLinks({ staff }: { staff: boolean }) {
+export function NavLinks({ role }: { role: string }) {
   const path = usePathname();
-  const links = staff ? [{ href: "/queue", label: "Queue" }, ...LINKS] : LINKS;
+  const staff = role !== "reporter";
+  const links = [
+    ...(staff ? [{ href: "/queue", label: "Queue" }] : []),
+    ...LINKS,
+    ...(staff ? [{ href: "/daily-updates", label: "Daily updates" }] : []),
+    ...(role === "admin" ? [{ href: "/master", label: "Master" }] : []),
+  ];
   return (
     <nav className="nav" aria-label="Main">
       {links.map((l) => (

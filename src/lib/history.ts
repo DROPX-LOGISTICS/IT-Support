@@ -18,6 +18,7 @@ export function describeEvent(e: HistoryEvent): string {
     case "confirmed": return to.startsWith("yes") ? `confirmed it works${to.includes("behalf") ? " (on behalf of the reporter)" : ""}` : "confirmed";
     case "reopened": return `said it is still not working${to.includes("behalf") ? " (recorded by a developer)" : ""}`;
     case "update_posted": return "posted an update";
+    case "daily_update_published": return "logged work on this ticket";
     case "meet_scheduled": return "scheduled a Meet session";
     case "email_sent": return `sent an email (${to})`;
     case "email_failed": return `could not send an email (${to})`;
