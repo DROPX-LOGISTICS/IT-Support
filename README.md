@@ -8,9 +8,12 @@ Next.js 14 (App Router, TypeScript) · Supabase (Postgres, auth, storage) · Gma
 
 ## Status
 
-Phase 1 (this branch): sign-in with Google (company domain only), all tables with
-row-level security, raise a ticket (with screenshots and `?portal=&page=` prefill),
-my tickets, Gmail sender interface. Later phases are listed in the spec (section 13).
+Phase 1: sign-in with Google (company domain only), all tables with row-level security,
+raise a ticket (screenshots, `?portal=&page=` prefill), my tickets, Gmail sender.
+Phase 2: developer queue (priority, then oldest; filters and search), ticket page (status,
+assignee, priority, expected date, viability, update, links, comments, internal notes, history),
+reporter confirmation ("Yes, it works" closes; "Still not working" reopens with a reason),
+emails on raise and on confirmation request. Later phases: spec section 13.
 
 ## Local setup
 
@@ -45,7 +48,7 @@ ever written to code, migrations or logs.
 ## Database
 
 Migrations live in `supabase/migrations/<UTC timestamp>_<n>.sql` and are safe to re-run.
-Apply `20261008120000_1.sql` with the Supabase SQL editor, or `supabase db push` against
+Apply `20261008120000_1.sql`, then `20261008130000_2.sql`, with the Supabase SQL editor, or `supabase db push` against
 the **development** project. It creates only objects prefixed `support_`: 11 tables,
 functions, triggers, policies and one private storage bucket (`support_attachments`).
 It seeds the six portal names (only People has a site URL) and one settings row.
@@ -92,6 +95,14 @@ variables the app works and email is simply skipped ("not configured").
 
 Emails are multipart text and HTML, user text is escaped, and a failed send never blocks a ticket action.
 
+### Phase 2 rollback (development only)
+
+```sql
+drop function if exists support_add_comment(uuid,text,boolean), support_confirm_ticket(uuid,boolean,text),
+  support_update_ticket(uuid,jsonb), support_change_status(uuid,text,text,text,text), support_actor();
+-- restore the phase 1 event_type check and events policy by re-running the matching parts of migration _1.
+```
+
 ## Access rules
 
 Reporters see only their own tickets. Developers, managers and admins see all; managers are
@@ -102,10 +113,14 @@ comments cannot be hard-deleted.
 
 ## Service role usage
 
-The service role bypasses row-level security. It is used in exactly two places:
+The service role bypasses row-level security. It is used in exactly these places:
 
 1. `src/app/auth/callback/route.ts`: promote a verified company-domain email listed in `ADMIN_EMAILS` to admin.
 2. `src/app/new/actions.ts`: upload screenshots to the private bucket, after the ticket was created for the signed-in person. Database rows for them are written with the person's own session.
+3. `src/lib/notifications.ts`: read the ticket and the staff email addresses to send the raise and confirmation emails, and record `email_sent` / `email_failed` events (reporters cannot read staff addresses).
+4. `src/app/api/attachments/[id]/route.ts`: read a private file, only after the person's own session found the attachment row (row-level security is the access check).
+
+Status changes, assignment, comments and confirmation all run through database functions as the signed-in person (no service role).
 
 ## Integration with other portals
 

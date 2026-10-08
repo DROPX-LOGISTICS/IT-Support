@@ -7,11 +7,12 @@ const LINKS = [
   { href: "/my-tickets", label: "My tickets" },
 ];
 
-export function NavLinks() {
+export function NavLinks({ staff }: { staff: boolean }) {
   const path = usePathname();
+  const links = staff ? [{ href: "/queue", label: "Queue" }, ...LINKS] : LINKS;
   return (
     <nav className="nav" aria-label="Main">
-      {LINKS.map((l) => (
+      {links.map((l) => (
         <Link key={l.href} href={l.href} aria-current={path === l.href ? "page" : undefined}>
           {l.label}
         </Link>

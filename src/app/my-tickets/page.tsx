@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CheckCircle2, Inbox, PlusCircle } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
+import { ConfirmBar } from "@/components/confirm-bar";
 import { NotConfigured, PriorityPill, StatusBadge } from "@/components/ui";
 import { requireUser } from "@/lib/session";
 import { userClient } from "@/lib/supabase/server";
@@ -72,13 +73,13 @@ export default async function MyTicketsPage({ searchParams }: { searchParams: { 
           </div>
         ) : (
           rows.map((t) => (
-            <article key={t.id} className="card ticket">
+            <article key={t.id} className="card ticket" style={t.status === "Done – awaiting confirmation" ? { borderColor: "var(--brand)" } : undefined}>
               <div className="ticket-top">
                 <span className="num">{t.number}</span>
                 <StatusBadge status={t.status} />
                 <PriorityPill priority={t.priority} />
               </div>
-              <h2>{t.title}</h2>
+              <h2><Link href={`/tickets/${t.id}`}>{t.title}</Link></h2>
               <div className="meta">
                 <span>{TYPE_LABEL[t.type]}</span>
                 {t.portal && <span>{t.portal.name}</span>}
@@ -86,6 +87,7 @@ export default async function MyTicketsPage({ searchParams }: { searchParams: { 
                 {t.expected_date && <span>Expected {fmt(t.expected_date)}</span>}
               </div>
               {t.developer_update && <div className="update"><strong>Latest update: </strong>{t.developer_update}</div>}
+              {t.status === "Done – awaiting confirmation" && <div className="update" style={{ background: "var(--brand-soft)" }}><ConfirmBar ticketId={t.id} /></div>}
             </article>
           ))
         )}

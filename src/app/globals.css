@@ -108,3 +108,21 @@ input:focus, select:focus, textarea:focus, .choice:focus-within { outline: none;
 .login .card { width: 100%; max-width: 400px; text-align: center; padding: 34px 28px; }
 .login .brand-mark { width: 52px; height: 52px; border-radius: 16px; margin: 0 auto 16px; }
 .page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+
+.spin { animation: spin 1s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } }
+.btn.good { background: var(--ok); color: #fff; } .btn.bad { background: var(--bad); color: #fff; }
+.ok-text { color: var(--ok); font-size: 14px; }
+.confirm-card { border-color: var(--brand); box-shadow: 0 0 0 4px var(--ring), var(--shadow); }
+.comment { padding: 12px 0; border-top: 1px solid var(--line); }
+.comment.internal { background: var(--warn-soft); margin: 0 -20px; padding: 12px 20px; }
+.comment-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; font-size: 14px; }
+.timeline { list-style: none; margin: 0; padding: 0 0 0 16px; border-left: 2px solid var(--line); }
+.timeline li { position: relative; padding: 0 0 16px 14px; font-size: 14px; overflow-wrap: anywhere; }
+.timeline li::before { content: ""; position: absolute; left: -22px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--brand); border: 2px solid var(--surface); }
+.filters { display: grid; gap: 12px; }
+.searchbox { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 0 12px; background: var(--surface); }
+.searchbox input { border: 0; box-shadow: none !important; padding: 10px 0; }
+.filter-grid { display: grid; gap: 10px; grid-template-columns: repeat(5, 1fr); }
+@media (max-width: 760px) { .filter-grid { grid-template-columns: 1fr 1fr; } .comment.internal { margin: 0 -16px; padding: 12px 16px; } }
+.qrow { color: inherit; transition: transform .1s, border-color .15s; } .qrow:hover { border-color: var(--brand); transform: translateY(-1px); }
+.stack[style*="--gap"] > * + * { margin-top: var(--gap); }

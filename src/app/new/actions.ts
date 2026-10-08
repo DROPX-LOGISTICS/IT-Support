@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { MAX_FILES, sniffMime, storagePath, validateFiles } from "@/lib/attachments";
+import { notifyRaised } from "@/lib/notifications";
 import { requireUser } from "@/lib/session";
 import { serviceClient } from "@/lib/supabase/admin";
 import { userClient } from "@/lib/supabase/server";
@@ -68,6 +69,8 @@ export async function raiseTicket(_prev: RaiseState, formData: FormData): Promis
     }
   }
 
+  await notifyRaised(created.id);
   revalidatePath("/my-tickets");
+  revalidatePath("/queue");
   redirect(`/my-tickets?raised=${encodeURIComponent(created.number)}${filesFailed ? "&files=failed" : ""}`);
 }
