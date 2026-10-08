@@ -1,0 +1,33 @@
+{
+  "name": "dropx-it-support",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --no-warnings --test \"src/**/*.test.mjs\""
+  },
+  "engines": {
+    "node": ">=22.6"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.117.3",
+    "lucide-react": "^0.468.0",
+    "next": "^14.2.35",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.35",
+    "typescript": "^5.9.3"
+  }
+}
