@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, CheckCircle2, GitCommit, Info } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download, GitCommit, Info } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { DailyRowForm } from "@/components/daily-row-form";
 import { NotConfigured } from "@/components/ui";
@@ -92,6 +92,16 @@ export default async function DailyUpdatesPage({ searchParams }: { searchParams:
             {drafts.length > 1 && own && <form action={publishAll}><input type="hidden" name="date" value={date} /><button className="btn ghost" type="submit">Publish all drafts ({drafts.length})</button></form>}
           </div>
         )}
+
+        <details className="card" style={{ marginTop: 16 }}>
+          <summary style={{ cursor: "pointer", fontWeight: 700 }}><Download size={16} aria-hidden style={{ verticalAlign: "-3px" }} /> Export published updates (CSV)</summary>
+          <form method="get" action="/api/export/daily-updates" className="grid2" style={{ marginTop: 12 }}>
+            <div><label className="field" htmlFor="from">From</label><input id="from" type="date" name="from" defaultValue={date} style={{ width: "100%", font: "inherit", padding: "9px 12px", border: "1px solid var(--line)", borderRadius: 10, background: "var(--surface)", color: "var(--ink)" }} /></div>
+            <div><label className="field" htmlFor="to">To</label><input id="to" type="date" name="to" defaultValue={date} style={{ width: "100%", font: "inherit", padding: "9px 12px", border: "1px solid var(--line)", borderRadius: 10, background: "var(--surface)", color: "var(--ink)" }} /></div>
+            {viewDev && <input type="hidden" name="dev" value={viewDev} />}
+            <div className="actions" style={{ gridColumn: "1 / -1" }}><button className="btn" type="submit">Download CSV</button></div>
+          </form>
+        </details>
 
         <p className="muted" style={{ margin: "8px 2px" }}>{fmtDate(date)} · {rows.length} row{rows.length === 1 ? "" : "s"}</p>
         {rows.length === 0 && <div className="card empty"><h2>No updates for this day</h2><p className="muted" style={{ margin: 0 }}>{user.role === "manager" ? "Nothing has been published yet." : "Press “Draft from commits” or add a row by hand."}</p></div>}

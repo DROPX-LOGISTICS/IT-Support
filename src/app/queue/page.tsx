@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Search } from "lucide-react";
+import { Download, Search } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { NotConfigured, PriorityPill, StatusBadge } from "@/components/ui";
 import { isStaff } from "@/lib/access";
 import { fmtDate } from "@/lib/format";
 import { parseQueueFilters } from "@/lib/queue-filters";
+import { applyQueueFilters } from "@/lib/queue-query";
 import { requireUser } from "@/lib/session";
 import { userClient } from "@/lib/supabase/server";
 import { PRIORITIES, PRIORITY_LABEL, STATUSES, TYPE_LABEL, TICKET_TYPES, type Priority, type Status, type TicketType } from "@/lib/tickets";
@@ -26,22 +27,13 @@ export default async function QueuePage({ searchParams }: { searchParams: Record
     supabase.from("support_users").select("id,name").in("role", ["developer", "admin"]).eq("is_active", true).order("name").returns<{ id: string; name: string }[]>(),
   ]);
 
-  let q = supabase
-    .from("support_tickets")
-    .select("id,number,type,title,priority,status,expected_date,created_at,assignee_id,reporter_name,portal:support_portals(name)")
-    .is("deleted_at", null);
-  if (f.type) q = q.eq("type", f.type);
-  if (f.priority) q = q.eq("priority", f.priority);
-  if (f.status === "open") q = q.not("status", "in", '("Closed","Not viable")');
-  else if (f.status !== "all") q = q.eq("status", f.status);
   const portalId = (portals ?? []).find((p) => p.code === f.portal)?.id;
-  if (f.portal && portalId) q = q.eq("portal_id", portalId);
-  if (f.assignee === "me") q = q.eq("assignee_id", user.id);
-  else if (f.assignee === "none") q = q.is("assignee_id", null);
-  else if (f.assignee) q = q.eq("assignee_id", f.assignee);
-  if (f.q) q = q.or(`number.ilike.%${f.q}%,title.ilike.%${f.q}%,description.ilike.%${f.q}%,reporter_name.ilike.%${f.q}%`);
+  const base = supabase
+    .from("support_tickets")
+    .select("id,number,type,title,priority,status,expected_date,created_at,assignee_id,reporter_name,portal:support_portals(name)");
+  const q = applyQueueFilters(base, f, { portalId, userId: user.id });
   // Priority first (P0 before P3), then oldest first.
-  const { data, error } = await q.order("priority").order("created_at").limit(150).returns<Row[]>();
+  const { data, error } = (await q.order("priority").order("created_at").limit(150)) as { data: Row[] | null; error: { message: string } | null };
   const rows = data ?? [];
   const nameOf = (id: string | null) => (devs ?? []).find((d) => d.id === id)?.name;
 
@@ -64,7 +56,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Record
             <select name="portal" defaultValue={f.portal} aria-label="Portal"><option value="">Any portal</option>{(portals ?? []).map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}</select>
             <select name="assignee" defaultValue={f.assignee} aria-label="Assignee"><option value="">Anyone</option><option value="me">Assigned to me</option><option value="none">Unassigned</option>{(devs ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
           </div>
-          <div className="actions"><Link className="btn ghost" href="/queue">Clear</Link><button className="btn" type="submit">Apply</button></div>
+          <div className="actions"><a className="btn ghost" href={`/api/export/tickets?${new URLSearchParams(Object.entries(f).filter(([, v]) => v) as [string, string][]).toString()}`}><Download size={16} aria-hidden /> Export CSV</a><Link className="btn ghost" href="/queue">Clear</Link><button className="btn" type="submit">Apply</button></div>
         </form>
 
         {error && <div className="banner bad" role="alert" style={{ marginTop: 16 }}>We could not load the queue. Please refresh.</div>}
