@@ -60,3 +60,9 @@ test("phase 3: a published daily update never exposes its work text in ticket hi
   const m = sql.match(/'daily_update_published', '([^']*)'/);
   assert.equal(m[1], "published");
 });
+
+test("phase 4: saving a Meet session is developer-only and only accepts a Meet link", () => {
+  assert.match(sql, /create or replace function support_save_meet/);
+  assert.match(sql, /v_user\.role not in \('developer','admin'\) then raise exception 'Not allowed'/);
+  assert.match(sql, /meet\\\.google\\\.com/);
+});

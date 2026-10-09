@@ -17,7 +17,9 @@ emails on raise and on confirmation request.
 Phase 3: Master (portals, repositories with path prefixes, developers and their GitHub identities,
 people and roles, unmatched commits), the daily job that drafts each developer's update from
 yesterday's commits, and the Daily updates page (review, edit hours, blocker and next step, publish).
-Later phases: spec section 13.
+Phase 4: Schedule Meet (pre-filled Google Calendar link, Meet link saved on the ticket), CSV export
+of tickets and published daily updates, and the one-time import script for the sheet.
+Everything still to set up or build is in [`docs/pending-setup-and-todo.md`](docs/pending-setup-and-todo.md).
 
 ## Local setup
 
@@ -53,7 +55,7 @@ ever written to code, migrations or logs.
 ## Database
 
 Migrations live in `supabase/migrations/<UTC timestamp>_<n>.sql` and are safe to re-run.
-Apply `20261008120000_1.sql`, `20261008130000_2.sql`, then `20261008140000_3.sql`, with the Supabase SQL editor, or `supabase db push` against
+Apply `20261008120000_1.sql`, `…130000_2.sql`, `…140000_3.sql`, then `…150000_4.sql`, with the Supabase SQL editor, or `supabase db push` against
 the **development** project. It creates only objects prefixed `support_`: 11 tables,
 functions, triggers, policies and one private storage bucket (`support_attachments`).
 It seeds the six portal names (only People has a site URL) and one settings row.
@@ -107,6 +109,24 @@ drop function if exists support_add_comment(uuid,text,boolean), support_confirm_
   support_update_ticket(uuid,jsonb), support_change_status(uuid,text,text,text,text), support_actor();
 -- restore the phase 1 event_type check and events policy by re-running the matching parts of migration _1.
 ```
+
+### Phase 4 rollback (development only)
+
+```sql
+drop function if exists support_save_meet(uuid,text,timestamptz);
+```
+
+## One-time import of the existing sheet
+
+Export each tab as CSV, then (staging project in the environment, `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`):
+
+```bash
+npm run import:sheet -- --bugs bugs.csv --features features.csv --daily daily.csv --developer "Ravi"           # dry run
+npm run import:sheet -- --bugs bugs.csv --features features.csv --daily daily.csv --developer "Ravi" --apply   # write
+```
+
+It is a dry run unless `--apply` is given, never deletes, keeps the sheet's IDs, and is safe to run again.
+See `docs/pending-setup-and-todo.md`, section 8, for what it skips and how it maps statuses.
 
 ### Phase 3 rollback (development only)
 

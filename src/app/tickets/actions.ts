@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { canChangeTicket } from "@/lib/access";
 import { notifyConfirmationRequest } from "@/lib/notifications";
+import { istLocalToIso, parseMeetLink } from "@/lib/meet";
 import { requireUser } from "@/lib/session";
 import { userClient } from "@/lib/supabase/server";
 import { DONE, checkConfirmation, checkTransition } from "@/lib/status-flow";
@@ -24,6 +25,7 @@ const FRIENDLY: [string, string][] = [
   ["This ticket is closed", "This ticket is closed."],
   ["Viability applies", "Viability applies to feature requests only."],
   ["Write a comment", "Write a comment of up to 5000 characters."],
+  ["Enter a Google Meet link", "Enter a Google Meet link like https://meet.google.com/abc-defg-hij."],
   ["Not allowed", "You are not allowed to do that."],
 ];
 function friendly(message: string | undefined): string {
@@ -126,4 +128,22 @@ export async function confirmTicket(_p: ActionResult, fd: FormData): Promise<Act
   if (error) return { ok: false, message: friendly(error.message) };
   refresh(id);
   return { ok: true, message: works ? "Thank you. This ticket is now closed." : "Thank you. We have reopened it." };
+}
+
+export async function saveMeet(_p: ActionResult, fd: FormData): Promise<ActionResult> {
+  const ctx = await context();
+  if (!ctx) return { ok: false, message: "Not configured." };
+  const id = str(fd.get("ticketId"));
+  if (!UUID.test(id)) return { ok: false, message: "Ticket not found." };
+  if (!canChangeTicket({ id: ctx.user.id, role: ctx.user.role, isActive: true })) return { ok: false, message: "You are not allowed to change tickets." };
+  const rawLink = str(fd.get("link"));
+  const link = rawLink ? parseMeetLink(rawLink) : null;
+  if (rawLink && !link) return { ok: false, message: "Enter a Google Meet link like https://meet.google.com/abc-defg-hij." };
+  const rawAt = str(fd.get("at"));
+  const at = rawAt ? istLocalToIso(rawAt) : null;
+  if (rawAt && !at) return { ok: false, message: "Enter a valid date and time." };
+  const { error } = await ctx.supabase.rpc("support_save_meet", { p_ticket: id, p_link: link, p_at: at });
+  if (error) return { ok: false, message: friendly(error.message) };
+  refresh(id);
+  return { ok: true, message: link ? "Meet session saved." : "Meet session removed." };
 }

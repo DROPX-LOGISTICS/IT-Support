@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, CalendarClock, Clock, FileText, Lock, MessageSquare, Paperclip, Phone, User } from "lucide-react";
+import { ArrowLeft, CalendarClock, Video, Clock, FileText, Lock, MessageSquare, Paperclip, Phone, User } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { CommentForm } from "@/components/comment-form";
 import { ConfirmBar } from "@/components/confirm-bar";
+import { MeetPanel } from "@/components/meet-panel";
 import { DetailsForm, StatusForm } from "@/components/staff-controls";
 import { NotConfigured, PriorityPill, StatusBadge } from "@/components/ui";
 import { canChangeTicket, isStaff } from "@/lib/access";
 import { fmtDate, fmtDateTime } from "@/lib/format";
+import { buildCalendarUrl } from "@/lib/calendar-link";
+import { appUrl } from "@/lib/config";
 import { describeEvent } from "@/lib/history";
+import { isoToIstLocal } from "@/lib/meet";
 import { requireUser } from "@/lib/session";
 import { userClient } from "@/lib/supabase/server";
 import { DONE, allowedNextStatuses } from "@/lib/status-flow";
@@ -21,7 +25,7 @@ type Ticket = {
   id: string; number: string; type: TicketType; title: string; description: string; steps: string | null; page_url: string | null;
   priority: Priority; status: Status; reporter_id: string | null; reporter_name: string; reporter_email: string;
   raised_by_name: string; raised_by_phone: string | null; assignee_id: string | null; viable: string | null; viable_reason: string | null;
-  expected_date: string | null; developer_update: string | null; links: string[]; reopen_count: number; created_at: string;
+  expected_date: string | null; developer_update: string | null; links: string[]; reopen_count: number; created_at: string; meet_link: string | null; meet_at: string | null;
   portal: { name: string } | null;
 };
 
@@ -47,11 +51,13 @@ export default async function TicketPage({ params }: { params: { id: string } })
     supabase.from("support_events").select("id,event_type,actor_name,old_value,new_value,reason,created_at").eq("ticket_id", t.id).order("created_at").returns<{ id: string; event_type: string; actor_name: string; old_value: string | null; new_value: string | null; reason: string | null; created_at: string }[]>(),
     supabase.from("support_attachments").select("id,file_name,mime_type,size_bytes").eq("ticket_id", t.id).order("created_at").returns<{ id: string; file_name: string; mime_type: string; size_bytes: number }[]>(),
     staff
-      ? supabase.from("support_users").select("id,name").in("role", ["developer", "admin"]).eq("is_active", true).order("name").returns<{ id: string; name: string }[]>()
-      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+      ? supabase.from("support_users").select("id,name,email").in("role", ["developer", "admin"]).eq("is_active", true).order("name").returns<{ id: string; name: string; email: string }[]>()
+      : Promise.resolve({ data: [] as { id: string; name: string; email: string }[] }),
   ]);
   const developers = devs.data ?? [];
-  const assignee = developers.find((d) => d.id === t.assignee_id)?.name;
+  const assigneeRow = developers.find((d) => d.id === t.assignee_id);
+  const assignee = assigneeRow?.name;
+  const calendarUrl = buildCalendarUrl({ number: t.number, title: t.title, ticketUrl: `${appUrl()}/tickets/${t.id}`, guests: [t.reporter_email, assigneeRow?.email] });
   const isReporter = t.reporter_id === user.id;
   const awaiting = t.status === DONE;
 
@@ -76,6 +82,13 @@ export default async function TicketPage({ params }: { params: { id: string } })
 
         {awaiting && isReporter && <section className="card confirm-card"><ConfirmBar ticketId={t.id} /></section>}
         {awaiting && !isReporter && canChange && <section className="card confirm-card"><ConfirmBar ticketId={t.id} onBehalf /></section>}
+
+        {t.meet_link && t.status !== "Closed" && (
+          <section className="card">
+            <div className="section-title" style={{ marginBottom: 6 }}><Video size={18} aria-hidden /> Meet session</div>
+            <p style={{ margin: 0 }}>{t.meet_at ? `${new Date(t.meet_at).toLocaleString("en-IN", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })} IST · ` : ""}<a href={t.meet_link} target="_blank" rel="noopener noreferrer">Join the Meet</a></p>
+          </section>
+        )}
 
         {t.developer_update && (
           <section className="card">
@@ -117,6 +130,7 @@ export default async function TicketPage({ params }: { params: { id: string } })
         {canChange && t.status !== "Closed" && t.status !== "Not viable" && (
           <>
             <section className="card"><div className="section-title">Change status</div><StatusForm ticketId={t.id} status={t.status} options={allowedNextStatuses(t.type, t.status)} /></section>
+            <section className="card"><div className="section-title">Meet session</div><MeetPanel ticketId={t.id} calendarUrl={calendarUrl} meetLink={t.meet_link} meetAtLocal={t.meet_at ? isoToIstLocal(t.meet_at) : ""} /></section>
             <section className="card"><div className="section-title">Ticket details</div>
               <DetailsForm ticketId={t.id} type={t.type} priority={t.priority} assigneeId={t.assignee_id} expectedDate={t.expected_date}
                 developerUpdate={t.developer_update} links={t.links} viable={t.viable} viableReason={t.viable_reason} developers={developers} />
