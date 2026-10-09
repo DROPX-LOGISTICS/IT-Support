@@ -1,7 +1,7 @@
 import { PRIORITIES, STATUSES, TICKET_TYPES } from "./tickets.ts";
 
 export type QueueFilters = {
-  type: string; portal: string; status: string; priority: string; assignee: string; q: string;
+  type: string; portal: string; status: string; priority: string; assignee: string; q: string; overdue: string;
 };
 
 /** Search text goes into a PostgREST filter, so characters with special meaning are removed. */
@@ -19,5 +19,6 @@ export function parseQueueFilters(sp: Record<string, string | undefined>): Queue
     priority: pick(sp.priority, PRIORITIES),
     assignee: sp.assignee === "me" || sp.assignee === "none" || /^[0-9a-f-]{36}$/i.test(sp.assignee ?? "") ? sp.assignee! : "",
     q: sanitizeSearch(sp.q ?? ""),
+    overdue: sp.overdue === "1" ? "1" : "",
   };
 }

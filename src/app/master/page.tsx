@@ -7,10 +7,16 @@ import { canManageMaster } from "@/lib/access";
 import { requireUser } from "@/lib/session";
 import { userClient } from "@/lib/supabase/server";
 import { fmtDate } from "@/lib/format";
-import { addDeveloper, addPortal, addRepo, deleteRepo, dismissUnmatched, mapUnmatched, setUserAccess, updateDeveloper, updatePortal, updateRepo } from "./actions";
+import { loadSettings } from "@/lib/targets-server";
+import { githubConfigured } from "@/lib/github";
+import { mailStatus } from "@/lib/mail";
+import { calendarStatus } from "@/lib/google-calendar";
+import { sheetsStatus } from "@/lib/google-sheets";
+import { PRIORITIES, PRIORITY_LABEL } from "@/lib/tickets";
+import { updateSettings, addDeveloper, addPortal, addRepo, deleteRepo, dismissUnmatched, mapUnmatched, setUserAccess, updateDeveloper, updatePortal, updateRepo } from "./actions";
 
 export const dynamic = "force-dynamic";
-const TABS = [["portals", "Portals"], ["repos", "Repositories"], ["developers", "Developers"], ["people", "People & access"], ["unmatched", "Unmatched commits"]] as const;
+const TABS = [["portals", "Portals"], ["repos", "Repositories"], ["developers", "Developers"], ["people", "People & access"], ["unmatched", "Unmatched commits"], ["settings", "Settings"], ["integrations", "Integrations"]] as const;
 
 type Portal = { id: string; code: string; name: string; site_url: string | null; is_active: boolean; sort_order: number };
 type Repo = { id: string; repo: string; portal_id: string; path_prefixes: string[] };
@@ -34,6 +40,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
     supabase.from("support_unmatched_commits").select("*").order("commit_date", { ascending: false }).limit(100).returns<Unmatched[]>(),
   ]);
   const P = portals.data ?? [], R = repos.data ?? [], D = devs.data ?? [], U = people.data ?? [], X = unmatched.data ?? [];
+  const cfg = await loadSettings(supabase);
   const staffUsers = U.filter((u) => u.role !== "reporter");
   const portalName = (id: string) => P.find((p) => p.id === id)?.name ?? "";
   const Field = ({ label, children }: { label: string; children: React.ReactNode }) => <div><label className="field">{label}</label>{children}</div>;
@@ -146,6 +153,60 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
             ))}
           </div>
         )}
+
+
+        {tab === "settings" && (
+          <form action={updateSettings} className="stack">
+            <section className="card">
+              <div className="section-title">Targets (hours, wall-clock)</div>
+              <p className="hint" style={{ marginTop: 0 }}>A ticket past its response or fix target shows as overdue. A reopened ticket&apos;s fix clock restarts at the reopen. Tickets waiting for the reporter are never overdue.</p>
+              <div className="table-wrap"><table className="plain">
+                <thead><tr><th>Priority</th><th className="n">Respond within</th><th className="n">Fix within</th></tr></thead>
+                <tbody>{PRIORITIES.map((p) => (
+                  <tr key={p}><td>{p} · {PRIORITY_LABEL[p]}</td>
+                    <td className="n"><input type="text" inputMode="numeric" name={`response_${p}`} defaultValue={cfg.targets.response[p]} style={{ width: 90, textAlign: "right" }} aria-label={`${p} response hours`} /></td>
+                    <td className="n"><input type="text" inputMode="numeric" name={`fix_${p}`} defaultValue={cfg.targets.fix[p]} style={{ width: 90, textAlign: "right" }} aria-label={`${p} fix hours`} /></td></tr>
+                ))}</tbody>
+              </table></div>
+            </section>
+            <section className="card grid2">
+              <div className="section-title" style={{ gridColumn: "1 / -1", marginBottom: 0 }}>Waiting for the reporter</div>
+              <Field label="Remind after (days)"><input type="text" inputMode="numeric" name="reminder_days" defaultValue={cfg.reminderDays} /></Field>
+              <Field label="Close automatically after (days)"><input type="text" inputMode="numeric" name="auto_close_days" defaultValue={cfg.autoCloseDays} /></Field>
+            </section>
+            <section className="card">
+              <div className="section-title">Emails to send</div>
+              {([["n_raised", "raised", "A ticket is raised"], ["n_assigned", "assigned", "A ticket is assigned"], ["n_status", "status", "Status, update, reopen, not viable and Meet changes"], ["n_comment", "comment", "A comment is added"], ["n_confirmation", "confirmation", "Confirmation request and reminder"]] as const).map(([name, key, label]) => (
+                <label key={name} style={{ display: "flex", gap: 8, alignItems: "center", margin: "6px 0" }}><input type="checkbox" name={name} defaultChecked={cfg.notify[key] !== false} /> {label}</label>
+              ))}
+            </section>
+            <div className="actions"><button className="btn" type="submit">Save settings</button></div>
+          </form>
+        )}
+
+        {tab === "integrations" && (() => {
+          const mail = mailStatus(), cal = calendarStatus(), sh = sheetsStatus();
+          const rows: [string, boolean, string[], string][] = [
+            ["Email (Gmail)", mail.configured, mail.missing, "Raise, assignment, comment, status and reminder emails."],
+            ["GitHub", githubConfigured(), githubConfigured() ? [] : ["GITHUB_TOKEN"], "Daily updates drafted from commits."],
+            ["Scheduled jobs", Boolean(process.env.CRON_SECRET?.trim()), process.env.CRON_SECRET?.trim() ? [] : ["CRON_SECRET"], "Daily drafts, reminders and auto-close."],
+            ["Google Calendar (Meet)", cal.configured, cal.configured ? [] : cal.missing, "Creates, moves and cancels Meet sessions. Without it the Calendar link and manual Meet link are used."],
+            ["Google Sheets export", sh.configured, sh.configured ? [] : sh.missing, "Export straight to a Google Sheet. Without it, CSV download is used."],
+            ["Service role", Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()), process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ? [] : ["SUPABASE_SERVICE_ROLE_KEY"], "Attachments, system emails, jobs."],
+          ];
+          return (
+            <div className="stack">
+              <p className="hint" style={{ margin: 0 }}>Shows only whether each setting exists, never its value.</p>
+              {rows.map(([name, ok, missing, what]) => (
+                <div key={name} className="card">
+                  <div className="status-pill"><strong>{name}</strong><span className={ok ? "s-ok" : "s-off"}>{ok ? "Configured" : "Not configured"}</span></div>
+                  <div className="muted" style={{ fontSize: 14 }}>{what}</div>
+                  {!ok && missing.length > 0 && <div className="hint" style={{ overflowWrap: "anywhere" }}>Missing: {missing.join(", ")}</div>}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
 
         {tab === "unmatched" && (
           <div className="stack">

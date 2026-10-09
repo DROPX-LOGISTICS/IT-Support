@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { canManageMaster } from "@/lib/access";
 import { cleanSiteUrl, isPortalCode, isRepoName, parseList, parsePrefixes, slugify } from "@/lib/master-input";
+import { validateSettingsInput } from "@/lib/targets";
 import { requireUser } from "@/lib/session";
 import { userClient } from "@/lib/supabase/server";
 
@@ -136,4 +137,16 @@ export async function dismissUnmatched(fd: FormData) {
   if (!UUID.test(id)) done("unmatched", "Not found.", false);
   const { error } = await supabase.from("support_unmatched_commits").delete().eq("id", id);
   done("unmatched", error ? "Could not dismiss it." : "Dismissed.", !error);
+}
+
+export async function updateSettings(fd: FormData) {
+  const { supabase } = await admin();
+  const v = validateSettingsInput(Object.fromEntries([...fd.entries()].map(([k, x]) => [k, String(x)])));
+  if (!v.ok) done("settings", v.error, false);
+  const { error } = await supabase.from("support_settings").update({
+    response_hours: v.ok ? v.value.response_hours : undefined, fix_hours: v.ok ? v.value.fix_hours : undefined,
+    reminder_days: v.ok ? v.value.reminder_days : undefined, auto_close_days: v.ok ? v.value.auto_close_days : undefined,
+    notify: v.ok ? v.value.notify : undefined,
+  }).eq("singleton", true);
+  done("settings", error ? "Could not save the settings." : "Settings saved.", !error);
 }

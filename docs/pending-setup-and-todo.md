@@ -1,105 +1,92 @@
-# Pending setup and later development
+# Pending setup and what is not done
 
-What still has to be created, entered or verified before this goes live, and what is left to build.
-Written at the end of phase 4. Update it as items are done. Nothing here is a secret: values go in
-the hosting environment, never in git.
+Everything in the spec and the briefs is built except the items in section 3. This file lists what you still have
+to create or enter before go-live (section 1), what has never been run against a real service (section 2), and what
+was not done and why (section 3). Nothing here is a secret: values go in the hosting environment, never in git.
 
 ## 1. Setup checklist (in this order)
 
 | # | Item | Where | Status |
 |---|---|---|---|
 | 1 | Create the **staging** Supabase project (never production for testing) | Supabase | pending |
-| 2 | Apply the migrations in order: `20261008120000_1.sql`, `…130000_2.sql`, `…140000_3.sql`, `…150000_4.sql` | Supabase SQL editor or `supabase db push` | pending; **none has ever run on Postgres, expect small SQL fixes** |
+| 2 | Apply the migrations in order: `20261008120000_1.sql`, `…130000_2.sql`, `…140000_3.sql`, `…150000_4.sql`, `…160000_5.sql` | SQL editor or `supabase db push` | pending; **none has run on Postgres yet, expect small SQL fixes** |
 | 3 | Authentication, Providers, Google: enable, paste the Google OAuth client ID and secret | Supabase dashboard | pending |
-| 4 | Authentication, URL Configuration: Site URL = `APP_URL`; redirect URLs `APP_URL/auth/callback` and `http://localhost:3000/auth/callback` | Supabase dashboard | pending |
-| 5 | Google Cloud: OAuth client (Web) for sign-in, redirect URI `https://<project-ref>.supabase.co/auth/v1/callback`; consent screen user type **Internal** | Google Cloud | pending |
-| 6 | Deploy on Vercel; add the domain `support.dropxlogistics.com` | Vercel, DNS | pending (site not set up yet) |
+| 4 | Authentication, URL Configuration: Site URL = `APP_URL`; redirect URLs `APP_URL/auth/callback`, `http://localhost:3000/auth/callback` | Supabase dashboard | pending |
+| 5 | Google Cloud: OAuth client (Web) for sign-in, redirect URI `https://<project-ref>.supabase.co/auth/v1/callback`; consent screen **Internal** | Google Cloud | pending |
+| 6 | Deploy on Vercel; add the domain `support.dropxlogistics.com`; confirm both crons appear | Vercel, DNS | pending |
 | 7 | Set the environment variables below | Vercel | pending |
-| 8 | Gmail sender: enable Gmail API, OAuth client (Web) with redirect URI `http://localhost:8765`, run `scripts/get-gmail-refresh-token.mjs` signed in as `tech@dropxlogistics.com` | Google Cloud, your laptop | pending |
-| 9 | GitHub token for the daily job (fine-grained, **Contents: read** and **Metadata: read** only). The repos sit under two owners (`nisar-dropx` and `DROPX-LOGISTICS`), so one token per owner may be needed; the code currently reads a single `GITHUB_TOKEN` | GitHub | pending; see "Later development" for the two-owner question |
-| 10 | Sign in once with the account in `ADMIN_EMAILS` (becomes admin), then fill Master (section 2) | the site | pending |
-| 11 | Deploy and confirm the cron entry in `vercel.json` shows in Vercel (daily 03:30 UTC = 09:00 IST) | Vercel | pending |
+| 8 | Gmail sender: enable Gmail API, OAuth client (Web) with redirect URI `http://localhost:8765`, run `scripts/get-gmail-refresh-token.mjs` as `tech@dropxlogistics.com` | Google Cloud, your laptop | pending |
+| 9 | GitHub token (fine-grained, **Contents: read** and **Metadata: read**). Repos sit under `nisar-dropx` and `DROPX-LOGISTICS`; the code reads one `GITHUB_TOKEN` | GitHub | pending (see 3.4) |
+| 10 | Google service account for Calendar and Sheets: reuse the `dropx-hrms` service account or create one; enable the **Calendar API**, **Sheets API** and **Drive API**; in Workspace Admin, Domain-wide delegation, authorise its client ID for the three scopes in the README | Google Cloud, Workspace Admin | pending |
+| 11 | Sign in once with the account in `ADMIN_EMAILS`, then fill Master (section below) | the site | pending |
 
 ### Environment variables
 
-| Variable | Status | Notes |
-|---|---|---|
-| `APP_URL` | not set | `https://support.dropxlogistics.com` |
-| `ALLOWED_EMAIL_DOMAIN` | not set | `dropxlogistics.com` |
-| `ADMIN_EMAILS` | not set | first admin(s), comma separated |
-| `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | not set | service role key is server only |
-| `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `MAIL_FROM` | not set | until set, email is skipped and recorded as `email_failed` |
-| `GITHUB_TOKEN` | not set | until set the Daily updates page says "GitHub is not configured" |
-| `CRON_SECRET` | not set | until set the cron route answers 503 |
+| Variable | Status |
+|---|---|
+| `APP_URL`, `ALLOWED_EMAIL_DOMAIN`, `ADMIN_EMAILS` | not set |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | not set |
+| `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `MAIL_FROM` | not set (email is skipped and recorded as `email_failed` until set) |
+| `GITHUB_TOKEN` | not set (Daily updates says "GitHub is not configured") |
+| `CRON_SECRET` | not set (both cron routes answer 503) |
+| `GOOGLE_WORKSPACE_SERVICE_ACCOUNT_JSON` (or the two-variable or `GCP_*` forms), `GOOGLE_CALENDAR_ORGANIZER`, optional `GOOGLE_SHEETS_OWNER` | not set (Meet falls back to the Calendar link, Sheets falls back to CSV) |
 
-## 2. Data to enter in Master (nothing is seeded except portal names)
+**Master, Integrations** shows which of these are set, by name only.
 
-- **Portal site addresses** for OpsPulse, DropX One, Dashboard, Connect and Delivery Tracker (only People has `https://people.dropxlogistics.com`). The DropX One path prefix is still "to confirm" in the spec.
-- **Repositories**, each attached to its portal, with path prefixes where one repo serves several portals (spec section 14):
-  `nisar-dropx/dropx-partner-dashboard`, `nisar-dropx/dropx-hrms`, `DROPX-LOGISTICS/Amazon-EDD-Worker`, `DROPX-LOGISTICS/ops-worker`, `DROPX-LOGISTICS/dropx-delivery-tracker`.
-  The partner-dashboard repo needs the OpsPulse prefixes plus a no-prefix row for Dashboard.
-- **The three developers**: name, the person they sign in as, GitHub logins, commit emails, commit names. Unknown authors land in Master, Unmatched commits.
-- **Roles**: people appear after first sign-in as reporters. Set developers, managers and admins in Master, People & access.
+### Data to enter in Master
 
-## 3. Must be tested once with real services (all unverified so far)
+- Site addresses for OpsPulse, DropX One, Dashboard, Connect and Delivery Tracker (only People is seeded). The DropX One path prefix is still "to confirm" in the spec.
+- The five repositories, each with its portal and path prefixes (the partner-dashboard repo needs the OpsPulse and Connect prefixes plus a no-prefix row for Dashboard).
+- The three developers with their GitHub logins, commit emails and names, then set roles in People & access.
+- Review Settings: targets, reminder and auto-close days, which emails are on.
 
-Everything below was written and unit-tested but never run against the real service:
+## 2. Never run against a real service (test these first)
 
-1. All four migrations on Postgres (functions, triggers, the replaced constraints and policies, the partial unique index).
-2. Row-level security with real roles: a reporter cannot open another person's ticket, attachment or history; managers are read-only and see only published daily updates; reporters never see internal notes or email events.
-3. Google sign-in end to end: domain refusal, the `email_verified` check, `support_register_user`, admin bootstrap from `ADMIN_EMAILS`.
-4. Raise a ticket with screenshots: numbering under two simultaneous raises, upload to the private bucket, download through `/api/attachments/[id]`.
-5. Status flow with two people acting at once (stale guard), confirmation by reporter and by developer with reason.
-6. Email through the Gmail API: raise, confirmation request, and `email_failed` recording when it cannot send.
-7. GitHub client: commit list and single-commit endpoints, pagination, the `since`/`until` window, `author.login`, `parents`, `files`; the cron bearer header on Vercel.
-8. Queue filters and search against real PostgREST (the `or(...)` search and `not in` status filter).
-9. Meet panel: the Calendar link opens pre-filled with title and guests; saving the Meet link and time.
-10. CSV exports opened in Google Sheets and Excel (columns, quoting, the formula guard, UTF-8).
-11. The import script: run it as a dry run against staging with the real CSV exports of the three tabs and read the report before `--apply`. Its column-name matching was written without seeing the real sheet.
-12. All screens in a real browser and on a phone, in light and dark mode. Only built and fetched with curl so far.
+1. All five migrations on Postgres; row-level security with real roles (reporter, developer, manager, admin).
+2. Google sign-in end to end, admin bootstrap, domain refusal.
+3. Raise with screenshots, numbering under simultaneous raises, attachment download.
+4. Status flow with two people at once; confirmation by reporter and by developer with reason.
+5. Every email (raise, team notice, P0, assigned, update, status, comment, confirmation, reminder, reopened, not viable, Meet) and the Retry button; the Master switches.
+6. GitHub client (commit lists, pagination, `author.login`, `parents`, `files`).
+7. **Google Calendar**: create, move and cancel a real Meet session, guests invited, link saved; cancel on close and on auto-close. The code was tested against a fake Google (request shapes, JWT signature), never against Google.
+8. **Google Sheets** export: sheet created, filled, shared with the requester.
+9. Board drag and drop in a real browser (mouse) and the "Move to…" list on a phone; dialog for reason or update.
+10. Summary numbers against real data; overdue flags against your real targets.
+11. Both cron routes on Vercel (bearer header, schedule, 60 s limit with real volume).
+12. CSV and Sheets exports in Sheets and Excel; the import dry run with your real CSV exports; all screens on a phone, light and dark.
 
-## 4. Phase 5 (done by you in the portals' own repos)
+## 3. Not done, and why
 
-A "Report a problem" link in each portal: `https://support.dropxlogistics.com/new?portal=<code>&page=<current page URL, encoded>`.
-Codes: `people`, `opspulse`, `dropx-one`, `dashboard`, `connect`, `delivery-tracker`. Unknown codes are ignored; `page` is shown as plain text and never followed.
+1. **Ticket-creation API and "open tickets" badge for the portals** (spec phase 6). Portal users are not signed into this site, so a portal would need a way to prove who the person is (a shared secret per portal, signed tokens, or single sign-on). That is a security design decision for you, and it also needs changes in each portal's repo, which I was told not to touch. The "Report a problem" link (phase 5) is yours.
+2. **"Daily update run time" setting wired to the schedule.** Vercel cron times are fixed in `vercel.json`; honouring a setting would need an hourly cron (a paid plan) plus a run log. The time stays in `vercel.json` (03:30 UTC) and the setting is not shown.
+3. **Anything that needs a real service or your Google admin.** I have no Supabase, Google, GitHub, Gmail or Vercel access here, so nothing in section 2 could be run, and the Workspace delegation in item 10 of the checklist can only be done by a Workspace admin. Every integration is built behind a "not configured" state.
+4. **GitHub access across two owners.** One `GITHUB_TOKEN` may not see both `nisar-dropx` and `DROPX-LOGISTICS` repos. Fix: a token per owner, or a GitHub App. Needs your choice and a GitHub admin.
+5. **Station mailboxes** (spec question 1). People sharing one mailbox share one identity. The stopgap (required "Your name" and optional phone on the form) is in; a real fix needs a decision (per-person sign-in, or a name picker with a PIN).
+6. **Sheet screenshot links** are kept as links on imported tickets (staff see them); the files are not downloaded into storage, because the links are private Drive files I cannot read.
+7. **Editing a published daily update.** Published rows are final by design; there is no "reopen to edit". Say if you want one.
+8. **Auto-close email.** The spec's email table has no auto-close notice, so none is sent; the ticket history shows it.
 
-## 5. Later development (from the spec and the briefs, not built yet)
+## 4. Decisions taken that you may want to revisit
 
-- **Google Meet created through the Calendar API** (spec phase 6). Today phase 4 opens a pre-filled Calendar link and the developer pastes the Meet link back. Needed for the API version: a Workspace service account with domain-wide delegation and the `calendar.events` scope (reuse the pattern in `dropx-hrms` for mailbox creation), an organiser mailbox to impersonate, storing the event ID in the existing `meet_event_id` column, and update/cancel when the session is rescheduled or the ticket closes.
-- **Manager board and summary**: board by status; open by priority, overdue, average time to fix, first-response time.
-- **Targets and overdue**: `response_hours` and `fix_hours` exist in `support_settings` but nothing reads them or shows an editor yet; the queue has no overdue filter.
-- **Remaining emails**: assignment, status change, comment, reminders. Only "raised" and "confirmation request" are sent. The notification switches in `support_settings.notify` are not read.
-- **Auto-close job**: `shouldAutoClose` (7 days awaiting confirmation) is written and tested; the scheduled job that applies it, and the reminder before it, are not.
-- **Export to Google Sheets** (briefs mentioned it): only CSV download exists. A Sheets API export would need a Google credential and a target sheet.
-- **Daily update run time**: the `daily_update_time` setting is not connected to the schedule; the time lives in `vercel.json`.
-- **GitHub access**: a GitHub App would replace one personal token per owner. The daily job reads default-branch commits only (unmerged branch work does not appear), up to 1000 commits per repo per day and 200 per-commit file lookups per repo per run.
-- **Station mailboxes** (spec question 1): people sharing one mailbox share one identity and can see each other's tickets. Stopgap in place: required "Your name" and optional phone on the form. A proper fix needs a decision (per-person sign-in, or a PIN/name picker).
-- **Attachments from the sheet**: imported screenshot links are kept as links on the ticket (staff see them); the files are not copied into storage.
-- **Edit published daily updates**: published rows are final today; there is no "reopen to edit".
-- **Operational**: backups and retention policy, error monitoring, rate limiting on raising tickets, security headers and a content security policy review, accessibility audit, load test with the real ticket volume.
+- Overdue is measured in wall-clock hours; a reopened ticket's fix clock restarts at the reopen; a ticket waiting for the reporter is never overdue.
+- The overdue queue filter is worked out in the app from up to 1000 open tickets, not in SQL.
+- Summary averages cover tickets raised in the last 90 days; "closed per week" uses the closing date; weeks start Monday (IST).
+- Blocked reasons stay internal (not emailed). Managers can see the board and summary but not move tickets.
+- The person who did an action is not emailed about it (except the reporter's own acknowledgement).
+- The reminder is sent once per wait for confirmation; if it cannot be sent it is retried the next day.
+- Auto-close is recorded as closed by the system (`auto_closed`), never as a reporter confirmation.
+- Every database read made by the site and the jobs skips the Next.js cache (found and fixed during testing: the scheduled jobs would otherwise act on stale rows).
+- Extra columns, tables and event types added beyond the spec are listed in the earlier pull requests, plus `support_tickets.reminded_at`, `support_settings.reminder_days`, `auto_close_days`, and event types `auto_closed`, `reminder_sent`, `meet_cancelled`.
 
-## 6. Decisions taken that you may want to revisit
+## 5. Security follow-ups
 
-- Ticket numbers are unique per type (`BUG-001`, `FR-001`, `SUP-001`) via a counter table; the import raises the counter past the highest imported ID.
-- Managers are read-only on tickets. Developers and admins can change tickets.
-- "Not viable" is terminal; "Done – awaiting confirmation" is left only through confirmation.
-- A developer or admin can confirm or reopen for the reporter only with a written reason, stored in history.
-- Comments are allowed until a ticket is Closed.
-- Published daily updates add only "logged work on this ticket" to ticket history, because reporters can read history.
-- A commit in a repository that is not registered, or by an author that matches no developer (or two), is reported and never guessed.
-- The import never deletes, defaults to a dry run, and needs `--apply` to write.
-- Extra columns and event types added beyond the spec: `support_portals.code`, `support_tickets.page_url`, `reopen_count`, `support_events.reason`, `support_attachments.comment_id`, `support_users.auth_user_id`, `support_settings.allowed_email_domain`, `support_daily_updates.source`, table `support_unmatched_commits`, event types `update_posted` and `daily_update_published`.
+- The GitHub token used to push this code lasts 7 days and is scoped to this repo. **Delete it** once the work is merged.
+- Secrets live only in the hosting environment.
+- The service role is used only where the README ("Service role usage") lists it. Re-check that list after any change.
+- Keep the Google consent screen **Internal**. After first sign-in, review People & access.
+- Add backups and retention, error monitoring, rate limiting on raising tickets, and a content security policy review before a wide launch.
 
-## 7. Security follow-ups
+## 6. Other details
 
-- The GitHub token used to push this code was valid for 7 days and scoped to this repo. **Delete it** once the work is merged.
-- Secrets live only in the hosting environment. Check nothing was pasted into issues, pull requests or chat.
-- The service role is used in five places only (README, "Service role usage"). Re-check that list after any change.
-- Keep the Google consent screen **Internal**; the server also checks the email domain.
-- After first sign-in, review the People & access list and remove anyone who should not be there.
-
-## 8. Phase 4 specifics (this pull request)
-
-- **Schedule Meet**: ticket page, developers and admins. Opens a Google Calendar "new event" link with the title `NUMBER: title`, the reporter and assignee as guests and the ticket link in the description. The developer saves the event with Meet in Calendar, then pastes the Meet link and time (IST) on the ticket. Only `https://meet.google.com/xxx-xxxx-xxx` links are accepted. The reporter sees the session on the ticket. No time is pre-filled; the person picks it in Calendar (a suggested time could be added later).
-- **CSV export**: Queue, "Export CSV" (same filters as the screen, up to 5000 rows, staff only); Daily updates, "Export published updates" (date range up to one year, up to 10000 rows). Internal notes and comments are never exported. Cells that start with `=`, `+`, `-` or `@` get an apostrophe so they cannot run as formulas.
-- **Import**: `npm run import:sheet -- --bugs bugs.csv --features features.csv --daily daily.csv --developer "Ravi"` (dry run), add `--apply` to write, `--create-portals` to create portal names the sheet uses. Needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` of the staging project. Keeps existing IDs; skips rows without a valid ID, with an unknown portal, or already imported; links reporters by email or exact name (re-run after they sign in to link earlier tickets); a ticket is closed only when the sheet's status is done **and** "does it work now?" is yes. The daily log tab has no developer column, so `--developer` names whose rows they are. Dates are read day first (`05/10/2026` is 5 October).
+- **Phase 5** (yours): `https://support.dropxlogistics.com/new?portal=<code>&page=<encoded page URL>`; codes `people`, `opspulse`, `dropx-one`, `dashboard`, `connect`, `delivery-tracker`.
+- **Import** (`npm run import:sheet`): dry run by default, `--apply` to write; flexible column names matched without seeing your real sheet, so read the dry-run report first.

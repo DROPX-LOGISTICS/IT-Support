@@ -5,8 +5,13 @@ import { AppHeader } from "@/components/app-header";
 import { CommentForm } from "@/components/comment-form";
 import { ConfirmBar } from "@/components/confirm-bar";
 import { MeetPanel } from "@/components/meet-panel";
+import { RetryEmail } from "@/components/retry-email";
+import { calendarStatus } from "@/lib/google-calendar";
+import { isMailKind } from "@/lib/email-content";
+import { loadSettings } from "@/lib/targets-server";
+import { overdueInfo } from "@/lib/targets";
 import { DetailsForm, StatusForm } from "@/components/staff-controls";
-import { NotConfigured, PriorityPill, StatusBadge } from "@/components/ui";
+import { NotConfigured, OverdueBadge, PriorityPill, StatusBadge } from "@/components/ui";
 import { canChangeTicket, isStaff } from "@/lib/access";
 import { fmtDate, fmtDateTime } from "@/lib/format";
 import { buildCalendarUrl } from "@/lib/calendar-link";
@@ -25,7 +30,7 @@ type Ticket = {
   id: string; number: string; type: TicketType; title: string; description: string; steps: string | null; page_url: string | null;
   priority: Priority; status: Status; reporter_id: string | null; reporter_name: string; reporter_email: string;
   raised_by_name: string; raised_by_phone: string | null; assignee_id: string | null; viable: string | null; viable_reason: string | null;
-  expected_date: string | null; developer_update: string | null; links: string[]; reopen_count: number; created_at: string; meet_link: string | null; meet_at: string | null;
+  expected_date: string | null; developer_update: string | null; links: string[]; reopen_count: number; created_at: string; meet_link: string | null; meet_at: string | null; meet_event_id: string | null; first_response_at: string | null; confirmed_at: string | null;
   portal: { name: string } | null;
 };
 
@@ -60,6 +65,8 @@ export default async function TicketPage({ params }: { params: { id: string } })
   const calendarUrl = buildCalendarUrl({ number: t.number, title: t.title, ticketUrl: `${appUrl()}/tickets/${t.id}`, guests: [t.reporter_email, assigneeRow?.email] });
   const isReporter = t.reporter_id === user.id;
   const awaiting = t.status === DONE;
+  const due = staff ? overdueInfo(t, (await loadSettings(supabase)).targets, new Date()) : null;
+  const apiReady = calendarStatus().configured;
 
   return (
     <>
@@ -70,7 +77,7 @@ export default async function TicketPage({ params }: { params: { id: string } })
         </Link>
 
         <div>
-          <div className="ticket-top"><span className="num">{t.number}</span><StatusBadge status={t.status} /><PriorityPill priority={t.priority} /></div>
+          <div className="ticket-top"><span className="num">{t.number}</span><StatusBadge status={t.status} /><PriorityPill priority={t.priority} />{due?.overdue && <OverdueBadge hours={due.hoursOver} />}</div>
           <h1 style={{ overflowWrap: "anywhere" }}>{t.title}</h1>
           <div className="meta">
             <span>{TYPE_LABEL[t.type]}</span>{t.portal && <span>{t.portal.name}</span>}
@@ -130,7 +137,7 @@ export default async function TicketPage({ params }: { params: { id: string } })
         {canChange && t.status !== "Closed" && t.status !== "Not viable" && (
           <>
             <section className="card"><div className="section-title">Change status</div><StatusForm ticketId={t.id} status={t.status} options={allowedNextStatuses(t.type, t.status)} /></section>
-            <section className="card"><div className="section-title">Meet session</div><MeetPanel ticketId={t.id} calendarUrl={calendarUrl} meetLink={t.meet_link} meetAtLocal={t.meet_at ? isoToIstLocal(t.meet_at) : ""} /></section>
+            <section className="card"><div className="section-title">Meet session</div><MeetPanel ticketId={t.id} calendarUrl={calendarUrl} meetLink={t.meet_link} meetAtLocal={t.meet_at ? isoToIstLocal(t.meet_at) : ""} apiReady={apiReady} hasEvent={Boolean(t.meet_event_id)} /></section>
             <section className="card"><div className="section-title">Ticket details</div>
               <DetailsForm ticketId={t.id} type={t.type} priority={t.priority} assigneeId={t.assignee_id} expectedDate={t.expected_date}
                 developerUpdate={t.developer_update} links={t.links} viable={t.viable} viableReason={t.viable_reason} developers={developers} />
@@ -157,6 +164,7 @@ export default async function TicketPage({ params }: { params: { id: string } })
               <li key={e.id}>
                 <div><strong>{e.actor_name}</strong> {describeEvent(e)}</div>
                 {e.reason && <div className="muted" style={{ overflowWrap: "anywhere" }}>“{e.reason}”</div>}
+                {canChange && e.event_type === "email_failed" && e.new_value && isMailKind(e.new_value) && <RetryEmail ticketId={t.id} kind={e.new_value} />}
                 <div className="hint">{fmtDateTime(e.created_at)}</div>
               </li>
             ))}

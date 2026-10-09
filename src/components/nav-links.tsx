@@ -11,9 +11,10 @@ export function NavLinks({ role }: { role: string }) {
   const path = usePathname();
   const staff = role !== "reporter";
   const links = [
-    ...(staff ? [{ href: "/queue", label: "Queue" }] : []),
+    ...(staff ? [{ href: "/queue", label: "Queue" }, { href: "/board", label: "Board" }] : []),
     ...LINKS,
     ...(staff ? [{ href: "/daily-updates", label: "Daily updates" }] : []),
+    ...(role === "admin" || role === "manager" ? [{ href: "/summary", label: "Summary" }] : []),
     ...(role === "admin" ? [{ href: "/master", label: "Master" }] : []),
   ];
   return (

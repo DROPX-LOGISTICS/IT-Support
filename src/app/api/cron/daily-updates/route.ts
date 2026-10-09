@@ -1,22 +1,17 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
-import { draftFromCommits } from "@/lib/daily-draft";
 import { isDateString, previousIstDate } from "@/lib/commits";
+import { isAuthorizedCron } from "@/lib/cron-auth";
+import { draftFromCommits } from "@/lib/daily-draft";
 import { serviceClient } from "@/lib/supabase/admin";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const digest = (s: string) => createHash("sha256").update(s).digest();
-
-// Called by the scheduler with "Authorization: Bearer <CRON_SECRET>". Service role use #5:
+// Called by the scheduler with "Authorization: Bearer <CRON_SECRET>". Service role use:
 // there is no signed-in person, so the secret is the only access check.
 export async function GET(request: NextRequest) {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) return NextResponse.json({ ok: false, reason: "CRON_SECRET is not configured" }, { status: 503 });
-  const given = request.headers.get("authorization") ?? "";
-  if (!timingSafeEqual(digest(given), digest(`Bearer ${secret}`))) return NextResponse.json({ ok: false }, { status: 401 });
-
+  if (!process.env.CRON_SECRET?.trim()) return NextResponse.json({ ok: false, reason: "CRON_SECRET is not configured" }, { status: 503 });
+  if (!isAuthorizedCron(request.headers.get("authorization"), process.env.CRON_SECRET)) return NextResponse.json({ ok: false }, { status: 401 });
   const db = serviceClient();
   if (!db) return NextResponse.json({ ok: false, reason: "Supabase service role is not configured" }, { status: 503 });
   const asked = request.nextUrl.searchParams.get("date");
