@@ -4,6 +4,8 @@ import { AlertTriangle, CheckCircle2, Download, GitCommit, Info } from "lucide-r
 import { AppHeader } from "@/components/app-header";
 import { DailyRowForm } from "@/components/daily-row-form";
 import { NotConfigured } from "@/components/ui";
+import { SheetsExport } from "@/components/sheets-export";
+import { sheetsStatus } from "@/lib/google-sheets";
 import { isStaff } from "@/lib/access";
 import { isDateString, previousIstDate } from "@/lib/commits";
 import { fmtDate } from "@/lib/format";
@@ -101,6 +103,7 @@ export default async function DailyUpdatesPage({ searchParams }: { searchParams:
             {viewDev && <input type="hidden" name="dev" value={viewDev} />}
             <div className="actions" style={{ gridColumn: "1 / -1" }}><button className="btn" type="submit">Download CSV</button></div>
           </form>
+          <SheetsExport kind="daily" params={{ from: date, to: date, ...(viewDev ? { dev: viewDev } : {}) }} status={sheetsStatus().configured ? "ready" : "off"} />
         </details>
 
         <p className="muted" style={{ margin: "8px 2px" }}>{fmtDate(date)} · {rows.length} row{rows.length === 1 ? "" : "s"}</p>

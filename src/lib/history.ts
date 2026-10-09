@@ -2,6 +2,11 @@ export type HistoryEvent = {
   event_type: string; actor_name: string; old_value: string | null; new_value: string | null; reason: string | null;
 };
 
+const EMAIL_LABEL: Record<string, string> = {
+  raised: "acknowledgement", team_new: "notice to the team", assigned: "assignment notice", update: "update", status: "status change",
+  comment: "comment", confirmation: "confirmation request", reminder: "reminder", reopened: "reopen notice", not_viable: "not-viable notice", meet: "Meet invite",
+};
+
 /** One plain sentence per history row (after the actor's name). */
 export function describeEvent(e: HistoryEvent): string {
   const to = e.new_value ?? "";
@@ -20,8 +25,11 @@ export function describeEvent(e: HistoryEvent): string {
     case "update_posted": return "posted an update";
     case "daily_update_published": return "logged work on this ticket";
     case "meet_scheduled": return "scheduled a Meet session";
-    case "email_sent": return `sent an email (${to})`;
-    case "email_failed": return `could not send an email (${to})`;
+    case "email_sent": return `sent an email: ${EMAIL_LABEL[to] ?? to}`;
+    case "email_failed": return `could not send an email: ${EMAIL_LABEL[to] ?? to}`;
+    case "auto_closed": return "closed this ticket automatically because nobody answered";
+    case "reminder_sent": return "reminded the reporter to confirm";
+    case "meet_cancelled": return "cancelled the Meet session";
     default: return e.event_type.replace(/_/g, " ");
   }
 }

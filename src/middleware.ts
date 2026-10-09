@@ -12,6 +12,7 @@ export async function middleware(request: NextRequest) {
 
   let response = NextResponse.next({ request });
   const supabase = createServerClient(url, key, {
+    global: { fetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, { ...init, cache: "no-store" }) },
     cookies: {
       getAll: () => request.cookies.getAll(),
       setAll(items: { name: string; value: string; options: CookieOptions }[]) {

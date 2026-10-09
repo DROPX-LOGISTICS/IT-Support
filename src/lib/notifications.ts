@@ -1,91 +1,88 @@
 import "server-only";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { appUrl } from "./config.ts";
-import { sendMail, type MailResult } from "./mail/index.ts";
+import { buildEmail, recipientsFor, type MailExtra, type MailKind, type MailTicket } from "./email-content.ts";
+import { sendMail } from "./mail/index.ts";
 import { serviceClient } from "./supabase/admin.ts";
 
-type TicketRow = {
-  id: string; number: string; title: string; type: string; priority: string; developer_update: string | null;
-  reporter_name: string; reporter_email: string; portal: { name: string } | null;
+type Db = SupabaseClient;
+type Row = {
+  id: string; number: string; title: string; type: string; priority: string; status: string; developer_update: string | null;
+  viable_reason: string | null; expected_date: string | null; meet_link: string | null; meet_at: string | null;
+  reporter_id: string | null; reporter_name: string; reporter_email: string; assignee_id: string | null; portal: { name: string } | null;
 };
 
-const TYPE_WORD: Record<string, string> = { bug: "bug", feature: "feature request", support: "support request" };
+// Which switch in Master, Settings turns each email on or off.
+const FLAG: Record<MailKind, "raised" | "assigned" | "status" | "comment" | "confirmation"> = {
+  raised: "raised", team_new: "raised", assigned: "assigned", update: "status", status: "status", not_viable: "status",
+  reopened: "status", meet: "status", comment: "comment", confirmation: "confirmation", reminder: "confirmation",
+};
 
-async function load(ticketId: string) {
-  const admin = serviceClient();
-  if (!admin) return null;
-  const { data } = await admin
-    .from("support_tickets")
-    .select("id,number,title,type,priority,developer_update,reporter_name,reporter_email,portal:support_portals(name)")
-    .eq("id", ticketId)
-    .maybeSingle<TicketRow>();
-  return data ? { admin, ticket: data } : null;
-}
+export type NotifyOpts = { actorEmail?: string | null; extra?: MailExtra; commenterIsReporter?: boolean; ignoreSwitches?: boolean };
 
-async function record(admin: NonNullable<ReturnType<typeof serviceClient>>, ticketId: string, kind: string, result: MailResult) {
-  // A failed or skipped email is recorded so it can be retried; it never blocks the action.
-  await admin.from("support_events").insert({
-    ticket_id: ticketId,
-    actor_name: "System",
-    event_type: result.ok ? "email_sent" : "email_failed",
-    new_value: kind,
-    reason: result.ok ? null : result.reason === "not_configured" ? "email is not configured" : "send failed",
-  });
-}
-
-async function staffEmails(admin: NonNullable<ReturnType<typeof serviceClient>>, roles: string[]) {
-  const { data } = await admin.from("support_users").select("email").in("role", roles).eq("is_active", true);
+async function staffEmails(db: Db, roles: string[]) {
+  const { data } = await db.from("support_users").select("email").in("role", roles).eq("is_active", true);
   return (data ?? []).map((r: { email: string }) => r.email);
 }
 
-/** Acknowledge the reporter, tell all developers, and add managers when it is a P0. */
-export async function notifyRaised(ticketId: string): Promise<void> {
+async function record(db: Db, ticketId: string, kind: MailKind, ok: boolean, why?: string) {
+  // Failed or skipped sends are recorded so they can be retried from the ticket history; they never block the action.
+  await db.from("support_events").insert({
+    ticket_id: ticketId, actor_name: "System", event_type: ok ? "email_sent" : "email_failed", new_value: kind, reason: ok ? null : why ?? "send failed",
+  });
+}
+
+/** Sends one kind of email for a ticket. Never throws. Returns true when a message went out. */
+export async function notify(ticketId: string, kind: MailKind, opts: NotifyOpts = {}): Promise<boolean> {
   try {
-    const ctx = await load(ticketId);
-    if (!ctx) return;
-    const { admin, ticket: t } = ctx;
-    const link = { label: "Open your ticket", url: `${appUrl()}/tickets/${t.id}` };
-    const portal = t.portal?.name ?? "a portal";
-
-    const ack = await sendMail([t.reporter_email], `[${t.number}] We received your ticket`, {
-      heading: `We received your ticket ${t.number}`,
-      paragraphs: [`Hi ${t.reporter_name},`, `Thank you for telling us. We will look into "${t.title}" and keep you updated on the ticket page.`],
-      link,
-    });
-    await record(admin, t.id, "acknowledgement to reporter", ack);
-
-    const roles = t.priority === "P0" ? ["developer", "admin", "manager"] : ["developer", "admin"];
-    const team = [...new Set(await staffEmails(admin, roles))].filter((e) => e.toLowerCase() !== t.reporter_email.toLowerCase());
-    if (team.length) {
-      const tell = await sendMail(team, `[${t.number}] New ${t.priority} ${TYPE_WORD[t.type] ?? "ticket"} in ${portal}: ${t.title}`, {
-        heading: `${t.number} raised by ${t.reporter_name}`,
-        paragraphs: [`${t.priority} ${TYPE_WORD[t.type] ?? "ticket"} in ${portal}.`, t.title],
-        link: { label: "Open the ticket", url: link.url },
-      });
-      await record(admin, t.id, t.priority === "P0" ? "P0 alert to team" : "new ticket to team", tell);
+    const db = serviceClient();
+    if (!db) return false;
+    const { data: t } = await db.from("support_tickets")
+      .select("id,number,title,type,priority,status,developer_update,viable_reason,expected_date,meet_link,meet_at,reporter_id,reporter_name,reporter_email,assignee_id,portal:support_portals(name)")
+      .eq("id", ticketId).maybeSingle<Row>();
+    if (!t) return false;
+    if (!opts.ignoreSwitches) {
+      const { data: s } = await db.from("support_settings").select("notify").limit(1).maybeSingle();
+      if (s?.notify && s.notify[FLAG[kind]] === false) return false;
     }
+    const assignee = t.assignee_id ? (await db.from("support_users").select("email,name").eq("id", t.assignee_id).maybeSingle()).data : null;
+    const needsTeam = kind === "team_new" || kind === "comment" || kind === "reopened";
+    const [developers, managers] = needsTeam ? await Promise.all([staffEmails(db, ["developer", "admin"]), kind === "team_new" && t.priority === "P0" ? staffEmails(db, ["manager"]) : Promise.resolve([])]) : [[], []];
+    const to = recipientsFor(kind, {
+      reporterEmail: t.reporter_email, assigneeEmail: assignee?.email ?? null, developers, managers, priority: t.priority,
+      actorEmail: opts.actorEmail, commenterIsReporter: opts.commenterIsReporter,
+    });
+    if (!to.length) return false;
+    const mt: MailTicket = {
+      id: t.id, number: t.number, title: t.title, type: t.type, priority: t.priority, portal: t.portal?.name ?? "a portal", reporterName: t.reporter_name,
+      developerUpdate: t.developer_update, viableReason: t.viable_reason, expectedDate: t.expected_date, meetLink: t.meet_link, meetAt: t.meet_at, status: t.status,
+    };
+    const { subject, content } = buildEmail(kind, mt, `${appUrl()}/tickets/${t.id}`, opts.extra);
+    const res = await sendMail(to, subject, content);
+    await record(db, t.id, kind, res.ok, res.ok ? undefined : res.reason === "not_configured" ? "email is not configured" : "send failed");
+    return res.ok;
   } catch {
-    // Never let a notification problem reach the person's action.
+    return false;
   }
 }
 
-/** Ask the reporter to check the fix, with a link to confirm. */
-export async function notifyConfirmationRequest(ticketId: string): Promise<void> {
-  try {
-    const ctx = await load(ticketId);
-    if (!ctx) return;
-    const { admin, ticket: t } = ctx;
-    const r = await sendMail([t.reporter_email], `[${t.number}] Please check if it works now`, {
-      heading: `Does ${t.number} work now?`,
-      paragraphs: [
-        `Hi ${t.reporter_name},`,
-        `We have finished work on "${t.title}".`,
-        ...(t.developer_update ? [`Our update: ${t.developer_update}`] : []),
-        "Please open the ticket and tell us if it works. If it does not, tell us what you still see and we will pick it up again.",
-      ],
-      link: { label: "Check and confirm", url: `${appUrl()}/tickets/${t.id}` },
-    });
-    await record(admin, t.id, "confirmation request to reporter", r);
-  } catch {
-    // Ignored on purpose.
+/** Acknowledge the reporter, tell the developers, and add managers for a P0. */
+export async function notifyRaised(ticketId: string): Promise<void> {
+  await notify(ticketId, "raised", { ignoreSwitches: false });
+  await notify(ticketId, "team_new");
+}
+
+/** Resends the latest email of this kind from the ticket's current state (used by "Retry" in the history). */
+export async function retryEmail(ticketId: string, kind: MailKind): Promise<boolean> {
+  const db = serviceClient();
+  let extra: MailExtra | undefined;
+  let commenterIsReporter = false;
+  if (kind === "comment" && db) {
+    const { data: c } = await db.from("support_comments").select("author_id,author_name,body").eq("ticket_id", ticketId).eq("internal", false).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const { data: t } = await db.from("support_tickets").select("reporter_id").eq("id", ticketId).maybeSingle();
+    if (!c) return false;
+    extra = { commentAuthor: c.author_name, commentBody: c.body };
+    commenterIsReporter = c.author_id === t?.reporter_id;
   }
+  return notify(ticketId, kind === "raised" ? "raised" : kind, { extra, commenterIsReporter, ignoreSwitches: true });
 }

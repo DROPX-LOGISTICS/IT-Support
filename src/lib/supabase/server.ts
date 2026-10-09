@@ -9,6 +9,7 @@ export function userClient() {
   if (!cfg.configured) return null;
   const store = cookies();
   return createServerClient(cfg.url, cfg.anonKey, {
+    global: { fetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, { ...init, cache: "no-store" }) },
     cookies: {
       getAll: () => store.getAll(),
       setAll(items: { name: string; value: string; options: CookieOptions }[]) {

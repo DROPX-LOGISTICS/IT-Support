@@ -33,3 +33,8 @@ export function BrandMark({ size = 16 }: { size?: number }) {
     </span>
   );
 }
+
+export function OverdueBadge({ hours }: { hours: number }) {
+  const label = hours >= 48 ? `${Math.round(hours / 24)} d overdue` : `${Math.max(1, Math.round(hours))} h overdue`;
+  return <span className="badge b-overdue" title="Past its response or fix target">{label}</span>;
+}

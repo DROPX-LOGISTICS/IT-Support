@@ -19,6 +19,10 @@ people and roles, unmatched commits), the daily job that drafts each developer's
 yesterday's commits, and the Daily updates page (review, edit hours, blocker and next step, publish).
 Phase 4: Schedule Meet (pre-filled Google Calendar link, Meet link saved on the ticket), CSV export
 of tickets and published daily updates, and the one-time import script for the sheet.
+Phase 6: Board (drag or "Move to…", same rules as the ticket page), Summary for managers, response and fix
+targets with overdue flags and an overdue filter, all notification emails with retry, reminder and auto-close
+jobs, Meet sessions created, moved and cancelled through the Google Calendar API, and export to Google Sheets
+(each falls back to the earlier behaviour when Google access is not configured).
 Everything still to set up or build is in [`docs/pending-setup-and-todo.md`](docs/pending-setup-and-todo.md).
 
 ## Local setup
@@ -46,6 +50,9 @@ what is missing. Use a **development** Supabase project, never production.
 | `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET` | Email | Google OAuth client, see "Gmail sender" |
 | `GMAIL_REFRESH_TOKEN` | Email | Printed by `scripts/get-gmail-refresh-token.mjs` |
 | `MAIL_FROM` | Email | `tech@dropxlogistics.com` (display name defaults to "DropX IT Support"; `"Name" <address>` also works) |
+| `GOOGLE_WORKSPACE_SERVICE_ACCOUNT_JSON` (or `GOOGLE_WORKSPACE_CLIENT_EMAIL` + `GOOGLE_WORKSPACE_PRIVATE_KEY`, or the `GCP_PROJECT_NUMBER`, `GCP_WORKLOAD_IDENTITY_POOL_ID`, `GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID`, `GCP_SERVICE_ACCOUNT_EMAIL` federation set) | Calendar and Sheets | The same service account pattern `dropx-hrms` uses for mailbox creation (JSON can be raw or base64). In Google Workspace Admin, Security, API controls, Domain-wide delegation, authorise the service account's client ID for the scopes `https://www.googleapis.com/auth/calendar.events`, `https://www.googleapis.com/auth/spreadsheets` and `https://www.googleapis.com/auth/drive.file` |
+| `GOOGLE_CALENDAR_ORGANIZER` | Calendar | The mailbox that owns the Meet events, e.g. `tech@dropxlogistics.com` (the service account acts as this person) |
+| `GOOGLE_SHEETS_OWNER` | Sheets (optional) | The mailbox that owns exported sheets; defaults to `GOOGLE_CALENDAR_ORGANIZER` |
 | `GITHUB_TOKEN` | Daily updates | GitHub, Settings, Developer settings, Fine-grained token. Resource owner: each organisation/user that owns a listed repo (create one token per owner if needed); repositories: the listed ones; permissions: **Contents: read-only** and **Metadata: read-only**. Nothing else. Without it the page says "GitHub is not configured" and manual rows still work |
 | `CRON_SECRET` | Daily job | Any long random string (`openssl rand -hex 32`). On Vercel, set it as an environment variable: Vercel then sends it as `Authorization: Bearer <secret>` to the cron route |
 
@@ -55,7 +62,7 @@ ever written to code, migrations or logs.
 ## Database
 
 Migrations live in `supabase/migrations/<UTC timestamp>_<n>.sql` and are safe to re-run.
-Apply `20261008120000_1.sql`, `…130000_2.sql`, `…140000_3.sql`, then `…150000_4.sql`, with the Supabase SQL editor, or `supabase db push` against
+Apply `20261008120000_1.sql`, `…130000_2.sql`, `…140000_3.sql`, `…150000_4.sql`, then `…160000_5.sql`, with the Supabase SQL editor, or `supabase db push` against
 the **development** project. It creates only objects prefixed `support_`: 11 tables,
 functions, triggers, policies and one private storage bucket (`support_attachments`).
 It seeds the six portal names (only People has a site URL) and one settings row.
@@ -109,6 +116,23 @@ drop function if exists support_add_comment(uuid,text,boolean), support_confirm_
   support_update_ticket(uuid,jsonb), support_change_status(uuid,text,text,text,text), support_actor();
 -- restore the phase 1 event_type check and events policy by re-running the matching parts of migration _1.
 ```
+
+### Phase 6 rollback (development only)
+
+```sql
+drop function if exists support_save_meet_event(uuid,text,text,timestamptz), support_clear_reminder();
+drop trigger if exists support_tickets_clear_reminder on support_tickets;
+alter table support_tickets drop column if exists reminded_at;
+alter table support_settings drop column if exists reminder_days, drop column if exists auto_close_days;
+-- the event_type check and support_save_meet are restored by re-running the matching parts of migrations _2 and _4.
+```
+
+## Scheduled jobs
+
+`vercel.json` runs two daily jobs, both protected by `CRON_SECRET`: `/api/cron/daily-updates` (03:30 UTC) and
+`/api/cron/maintenance` (04:00 UTC = 09:30 IST). Maintenance sends the reminder once after the number of days in
+Master, Settings (default 3) and closes tickets nobody confirmed after the auto-close days (default 7), recorded as
+closed by the system. A reminder that cannot be sent is tried again the next day.
 
 ### Phase 4 rollback (development only)
 
@@ -165,6 +189,8 @@ The service role bypasses row-level security. It is used in exactly these places
 3. `src/lib/notifications.ts`: read the ticket and the staff email addresses to send the raise and confirmation emails, and record `email_sent` / `email_failed` events (reporters cannot read staff addresses).
 4. `src/app/api/attachments/[id]/route.ts`: read a private file, only after the person's own session found the attachment row (row-level security is the access check).
 
+6. `src/app/api/cron/maintenance/route.ts`: daily reminder and auto-close, protected by `CRON_SECRET`.
+7. `src/lib/meet-server.ts`: cancel a ticket's Calendar event and clear its Meet fields when the ticket closes or a developer cancels (the caller's role has been checked first).
 5. `src/app/api/cron/daily-updates/route.ts`: the scheduled job has no signed-in person; it is protected by `CRON_SECRET` (constant-time compare) and writes draft rows and unmatched commits. The manual "Draft from commits" button does **not** use the service role: it runs as the developer, so row-level security limits it to their own rows.
 
 Status changes, assignment, comments, confirmation and publishing a daily update all run through database functions as the signed-in person (no service role).

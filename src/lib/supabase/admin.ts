@@ -9,5 +9,9 @@ import { serviceRoleConfig } from "../config.ts";
 export function serviceClient() {
   const cfg = serviceRoleConfig();
   if (!cfg.configured) return null;
-  return createClient(cfg.url, cfg.serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  // Next.js caches GET requests made with fetch; database reads must always be live (the jobs act on them).
+  return createClient(cfg.url, cfg.serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }) },
+  });
 }
