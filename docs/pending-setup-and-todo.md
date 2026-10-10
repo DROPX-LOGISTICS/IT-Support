@@ -93,5 +93,8 @@ being admin-only; 20 simultaneous raises get 20 different numbers. This testing 
 
 ## 6. Other details
 
+- **Design**: the site uses the DropX look shared with People and OpsPulse (logo, sidebar, amber-to-orange brand), with a bottom bar on phones and a dark theme that follows the device.
+- **Design preview** (development only): `npm run dev`, then open `/dev/preview`. It shows the real components with made-up tickets and needs no database. It returns "not found" in a production build.
+
 - **Phase 5** (yours): `https://support.dropxlogistics.com/new?portal=<code>&page=<encoded page URL>`; codes `people`, `opspulse`, `dropx-one`, `dashboard`, `connect`, `delivery-tracker`.
 - **Import** (`npm run import:sheet`): dry run by default, `--apply` to write; flexible column names matched without seeing your real sheet, so read the dry-run report first.

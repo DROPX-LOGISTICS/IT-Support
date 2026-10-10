@@ -1,9 +1,9 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
-import { Bug, FileText, Lightbulb, LifeBuoy, Loader2, Paperclip, Send, X } from "lucide-react";
+import { AlertTriangle, Bug, FileText, ImagePlus, Lightbulb, LifeBuoy, Loader2, Send, X } from "lucide-react";
 import { raiseTicket, type RaiseState } from "./actions";
-import { PRIORITIES, PRIORITY_HINT, PRIORITY_LABEL, type TicketType } from "@/lib/tickets";
+import { PRIORITIES, PRIORITY_HINT, PRIORITY_LABEL, type Priority, type TicketType } from "@/lib/tickets";
 import { MAX_BYTES, MAX_FILES } from "@/lib/attachments";
 
 const TYPES: { value: TicketType; label: string; hint: string; icon: typeof Bug }[] = [
@@ -16,25 +16,36 @@ const COPY: Record<TicketType, { label: string; placeholder: string }> = {
   feature: { label: "What do you need, and why?", placeholder: "Describe the need and how it would help your work." },
   support: { label: "How can we help?", placeholder: "Tell us what you are trying to do." },
 };
+const DOT: Record<Priority, string> = { P0: "var(--bad)", P1: "var(--warn)", P2: "var(--info)", P3: "var(--faint)" };
+const ACCEPT = ["image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"];
 const initial: RaiseState = { ok: false, message: "" };
 
-function Submit() {
+function Submit({ blocked }: { blocked: boolean }) {
   const { pending } = useFormStatus();
   return (
-    <button className="btn" type="submit" disabled={pending}>
+    <button className="btn lg" type="submit" disabled={pending || blocked}>
       {pending ? <Loader2 size={18} className="spin" aria-hidden /> : <Send size={18} aria-hidden />}
       {pending ? "Sending…" : "Send ticket"}
     </button>
   );
 }
 
-export function TicketForm(props: { portals: { code: string; name: string }[]; defaultPortal: string; defaultPage: string; defaultName: string }) {
+export function TicketForm(props: { portals: { code: string; name: string }[]; defaultPortal: string; defaultPage: string; defaultName: string; defaultType?: TicketType }) {
   const [state, action] = useFormState(raiseTicket, initial);
-  const [type, setType] = useState<TicketType>("bug");
+  const [type, setType] = useState<TicketType>(props.defaultType ?? "bug");
   const [title, setTitle] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  const [over, setOver] = useState(false);
+  const [skipped, setSkipped] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
+  const banner = useRef<HTMLDivElement>(null);
   const e = state.errors ?? {};
+
+  // Small previews for pictures; the addresses are released when the list changes.
+  const previews = useMemo(() => files.map((f) => (f.type.startsWith("image/") ? URL.createObjectURL(f) : null)), [files]);
+  useEffect(() => () => previews.forEach((u) => u && URL.revokeObjectURL(u)), [previews]);
+  // After a failed send, bring the message into view.
+  useEffect(() => { if (state.message && !state.ok) banner.current?.scrollIntoView({ block: "center", behavior: "smooth" }); }, [state]);
 
   function syncFiles(next: File[]) {
     setFiles(next);
@@ -42,16 +53,22 @@ export function TicketForm(props: { portals: { code: string; name: string }[]; d
     next.forEach((f) => dt.items.add(f));
     if (fileInput.current) fileInput.current.files = dt.files;
   }
-  function onPick(list: FileList | null) {
+  function addFiles(list: FileList | File[] | null) {
     if (!list) return;
-    syncFiles([...files, ...Array.from(list)].slice(0, MAX_FILES));
+    const incoming = Array.from(list);
+    const good = incoming.filter((f) => ACCEPT.includes(f.type));
+    const next = [...files, ...good].slice(0, MAX_FILES);
+    const dropped = incoming.length - good.length;
+    const extra = files.length + good.length - next.length;
+    setSkipped([dropped ? `${dropped} file${dropped === 1 ? " is" : "s are"} not a picture or PDF` : "", extra > 0 ? `only ${MAX_FILES} files fit` : ""].filter(Boolean).join("; "));
+    syncFiles(next);
   }
   const tooBig = files.find((f) => f.size > MAX_BYTES);
 
   return (
-    <form action={action} className="stack" noValidate>
-      <style>{`.spin{animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      {state.message && !state.ok && <div className="banner bad" role="alert">{state.message}</div>}
+    <form action={action} className="stack" noValidate
+      onPaste={(ev) => { const pasted = Array.from(ev.clipboardData.files); if (pasted.length) { ev.preventDefault(); addFiles(pasted); } }}>
+      {state.message && !state.ok && <div ref={banner} className="banner bad" role="alert" style={{ marginBottom: 0 }}><AlertTriangle size={18} aria-hidden /><div>{state.message}</div></div>}
 
       <section className="card">
         <div className="section-title"><span className="step">1</span> What is this about?</div>
@@ -103,7 +120,7 @@ export function TicketForm(props: { portals: { code: string; name: string }[]; d
           {PRIORITIES.map((p) => (
             <label key={p} className="choice">
               <input type="radio" name="priority" value={p} defaultChecked={p === "P2"} />
-              <div className="t">{p} · {PRIORITY_LABEL[p]}</div>
+              <div className="t"><span className="dot-p" style={{ background: DOT[p] }} aria-hidden /> {p} · {PRIORITY_LABEL[p]}</div>
               <div className="d">{PRIORITY_HINT[p]}</div>
             </label>
           ))}
@@ -113,23 +130,28 @@ export function TicketForm(props: { portals: { code: string; name: string }[]; d
 
       <section className="card">
         <div className="section-title"><span className="step">4</span> Screenshots <span className="hint">(optional)</span></div>
-        <label className="drop">
-          <Paperclip size={20} aria-hidden style={{ verticalAlign: "-4px" }} /> Add screenshots or a PDF
-          <div className="hint">Up to {MAX_FILES} files, 5 MB each</div>
-          <input ref={fileInput} type="file" name="files" multiple accept="image/png,image/jpeg,image/gif,image/webp,application/pdf" onChange={(ev) => onPick(ev.target.files)} />
+        <label className={`drop${over ? " over" : ""}`}
+          onDragOver={(ev) => { ev.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
+          onDrop={(ev) => { ev.preventDefault(); setOver(false); addFiles(ev.dataTransfer.files); }}>
+          <ImagePlus size={22} aria-hidden style={{ verticalAlign: "-5px" }} /> <strong>Drop screenshots here</strong>, paste one, or choose files
+          <div className="hint">Pictures or a PDF. Up to {MAX_FILES} files, 5 MB each.</div>
+          <input ref={fileInput} type="file" name="files" multiple accept={ACCEPT.join(",")} onChange={(ev) => addFiles(ev.target.files)} />
         </label>
         {files.length > 0 && (
           <ul className="files">
             {files.map((f, i) => (
-              <li key={`${f.name}-${i}`}>
-                <FileText size={15} aria-hidden /><span>{f.name}</span>
-                <span className="hint" style={{ flex: "none" }}>{(f.size / 1024 / 1024).toFixed(1)} MB</span>
-                <button type="button" className="linklike" aria-label={`Remove ${f.name}`} onClick={() => syncFiles(files.filter((_, j) => j !== i))}><X size={15} aria-hidden /></button>
+              <li key={`${f.name}-${f.size}-${i}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {previews[i] ? <img className="thumb" src={previews[i]!} alt="" /> : <FileText size={18} aria-hidden />}
+                <span>{f.name}</span>
+                <span className="hint" style={{ flex: "none", color: f.size > MAX_BYTES ? "var(--bad)" : undefined }}>{(f.size / 1024 / 1024).toFixed(1)} MB</span>
+                <button type="button" className="linklike" aria-label={`Remove ${f.name}`} onClick={() => { setSkipped(""); syncFiles(files.filter((_, j) => j !== i)); }}><X size={15} aria-hidden /></button>
               </li>
             ))}
           </ul>
         )}
-        {(e.files || tooBig) && <div className="err">{e.files ?? `${tooBig!.name} is larger than 5 MB.`}</div>}
+        {skipped && <div className="hint" role="status" style={{ marginTop: 6 }}>Not added: {skipped}.</div>}
+        {(e.files || tooBig) && <div className="err" role="alert">{tooBig ? `${tooBig.name} is larger than 5 MB. Remove it to send.` : e.files}</div>}
       </section>
 
       <section className="card">
@@ -149,7 +171,7 @@ export function TicketForm(props: { portals: { code: string; name: string }[]; d
         <p className="hint" style={{ margin: "10px 0 0" }}>Using a shared station mailbox? Enter your own name so we know who to speak to.</p>
       </section>
 
-      <div className="actions"><Submit /></div>
+      <div className="actions sticky-actions"><span className="hint">You can follow it under My tickets.</span><Submit blocked={Boolean(tooBig)} /></div>
     </form>
   );
 }

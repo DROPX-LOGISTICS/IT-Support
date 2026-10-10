@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AppHeader } from "@/components/app-header";
+import { AppShell } from "@/components/app-shell";
+import { FilterForm } from "@/components/filter-form";
 import { Board, type BoardCard, type BoardColumn } from "@/components/board";
 import { NotConfigured } from "@/components/ui";
 import { canChangeTicket, isStaff } from "@/lib/access";
@@ -50,21 +51,24 @@ export default async function BoardPage({ searchParams }: { searchParams: Record
   const canMove = canChangeTicket({ id: user.id, role: user.role, isActive: true });
 
   return (
-    <>
-      <AppHeader user={user} />
-      <main className="container" style={{ maxWidth: 1240 }}>
-        <h1>Board</h1>
-        <p className="muted" style={{ margin: "0 0 16px" }}>{canMove ? "Drag a card to a highlighted column, or use “Move to…”. The same rules as the ticket page apply." : "Tickets by status. Managers can look but not move."}</p>
-        <form method="get" className="card filters" style={{ marginBottom: 16 }}>
-          <div className="filter-grid" style={{ gridTemplateColumns: "repeat(3, 1fr)" }}>
-            <select name="portal" defaultValue={f.portal} aria-label="Portal"><option value="">Any portal</option>{(portals ?? []).map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}</select>
-            <select name="assignee" defaultValue={f.assignee} aria-label="Assignee"><option value="">Anyone</option><option value="me">Assigned to me</option><option value="none">Unassigned</option>{(devs ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
-            <select name="priority" defaultValue={f.priority} aria-label="Priority"><option value="">Any priority</option>{PRIORITIES.map((p) => <option key={p} value={p}>{p} · {PRIORITY_LABEL[p]}</option>)}</select>
-          </div>
-          <div className="actions"><Link className="btn ghost" href="/board">Clear</Link><button className="btn" type="submit">Apply</button></div>
-        </form>
-        <Board columns={columns} canMove={canMove} />
-      </main>
-    </>
+    <AppShell user={user} width="wide">
+      <div className="page-head">
+        <div>
+          <p className="eyebrow">Team</p>
+          <h1>Board</h1>
+          <p className="muted">{canMove ? "Drag a card to a highlighted column, or use “Move to…”. The same rules as the ticket page apply." : "Tickets by status. Managers can look but not move."}</p>
+        </div>
+        <span className="muted" role="status">{cards.length} ticket{cards.length === 1 ? "" : "s"}</span>
+      </div>
+      <FilterForm key={`${f.portal}|${f.assignee}|${f.priority}`} action="/board" className="filters" style={{ marginBottom: 16 }}>
+        <div className="filter-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 240px))", alignItems: "center" }}>
+          <select name="portal" defaultValue={f.portal} aria-label="Portal"><option value="">Any portal</option>{(portals ?? []).map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}</select>
+          <select name="assignee" defaultValue={f.assignee} aria-label="Assignee"><option value="">Anyone</option><option value="me">Assigned to me</option><option value="none">Unassigned</option>{(devs ?? []).map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
+          <select name="priority" defaultValue={f.priority} aria-label="Priority"><option value="">Any priority</option>{PRIORITIES.map((p) => <option key={p} value={p}>{p} · {PRIORITY_LABEL[p]}</option>)}</select>
+          {(f.portal || f.assignee || f.priority) && <Link className="btn ghost sm" href="/board" style={{ justifySelf: "start" }}>Clear filters</Link>}
+        </div>
+      </FilterForm>
+      <Board columns={columns} canMove={canMove} />
+    </AppShell>
   );
 }
