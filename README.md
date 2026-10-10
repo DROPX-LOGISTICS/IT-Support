@@ -53,7 +53,7 @@ what is missing. Use a **development** Supabase project, never production.
 | `GOOGLE_WORKSPACE_SERVICE_ACCOUNT_JSON` (or `GOOGLE_WORKSPACE_CLIENT_EMAIL` + `GOOGLE_WORKSPACE_PRIVATE_KEY`, or the `GCP_PROJECT_NUMBER`, `GCP_WORKLOAD_IDENTITY_POOL_ID`, `GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID`, `GCP_SERVICE_ACCOUNT_EMAIL` federation set) | Calendar and Sheets | The same service account pattern `dropx-hrms` uses for mailbox creation (JSON can be raw or base64). In Google Workspace Admin, Security, API controls, Domain-wide delegation, authorise the service account's client ID for the scopes `https://www.googleapis.com/auth/calendar.events`, `https://www.googleapis.com/auth/spreadsheets` and `https://www.googleapis.com/auth/drive.file` |
 | `GOOGLE_CALENDAR_ORGANIZER` | Calendar | The mailbox that owns the Meet events, e.g. `tech@dropxlogistics.com` (the service account acts as this person) |
 | `GOOGLE_SHEETS_OWNER` | Sheets (optional) | The mailbox that owns exported sheets; defaults to `GOOGLE_CALENDAR_ORGANIZER` |
-| `GITHUB_TOKEN` | Daily updates | GitHub, Settings, Developer settings, Fine-grained token. Resource owner: each organisation/user that owns a listed repo (create one token per owner if needed); repositories: the listed ones; permissions: **Contents: read-only** and **Metadata: read-only**. Nothing else. Without it the page says "GitHub is not configured" and manual rows still work |
+| `GITHUB_TOKEN`, optional `GITHUB_TOKEN_NISAR_DROPX`, `GITHUB_TOKEN_DROPX_LOGISTICS` | Daily updates (a repo uses its owner's token if set, else `GITHUB_TOKEN`; the repos sit under two owners) | GitHub, Settings, Developer settings, Fine-grained token. Resource owner: each organisation/user that owns a listed repo (create one token per owner if needed); repositories: the listed ones; permissions: **Contents: read-only** and **Metadata: read-only**. Nothing else. Without it the page says "GitHub is not configured" and manual rows still work |
 | `CRON_SECRET` | Daily job | Any long random string (`openssl rand -hex 32`). On Vercel, set it as an environment variable: Vercel then sends it as `Authorization: Bearer <secret>` to the cron route |
 
 On Vercel add them under Project Settings, Environment Variables. Nothing secret is
@@ -62,7 +62,7 @@ ever written to code, migrations or logs.
 ## Database
 
 Migrations live in `supabase/migrations/<UTC timestamp>_<n>.sql` and are safe to re-run.
-Apply `20261008120000_1.sql`, `…130000_2.sql`, `…140000_3.sql`, `…150000_4.sql`, then `…160000_5.sql`, with the Supabase SQL editor, or `supabase db push` against
+Apply `20261008120000_1.sql`, `…130000_2.sql`, `…140000_3.sql`, `…150000_4.sql`, `…160000_5.sql`, then `…170000_6.sql`, with the Supabase SQL editor, or `supabase db push` against
 the **development** project. It creates only objects prefixed `support_`: 11 tables,
 functions, triggers, policies and one private storage bucket (`support_attachments`).
 It seeds the six portal names (only People has a site URL) and one settings row.
@@ -125,6 +125,21 @@ drop trigger if exists support_tickets_clear_reminder on support_tickets;
 alter table support_tickets drop column if exists reminded_at;
 alter table support_settings drop column if exists reminder_days, drop column if exists auto_close_days;
 -- the event_type check and support_save_meet are restored by re-running the matching parts of migrations _2 and _4.
+```
+
+## Testing the database
+
+`npm run test:db` creates a throwaway database on a **local** PostgreSQL (you need `psql` and `createdb`), applies every
+migration twice (they are safe to re-run), then runs `supabase/tests/rls.test.sql` as real roles (anonymous, reporter,
+developer, manager, admin): who can read and write what, the status flow and its stale guard, confirmation, history that
+cannot be edited, daily updates, Meet, attachments, settings, and 20 simultaneous raises that must get 20 different numbers.
+Small stand-ins in `supabase/tests/stubs.sql` replace what Supabase provides (`auth.uid()`, `auth.jwt()`, the three roles,
+the storage bucket table), so it proves the SQL and the access rules, not Supabase itself. Never point it at a real project.
+
+### Phase 7 rollback (development only)
+
+```sql
+-- migration _6 only dropped two policies and replaced two functions; to undo, re-run the matching parts of migrations _1 and _2.
 ```
 
 ## Scheduled jobs

@@ -66,3 +66,12 @@ test("phase 4: saving a Meet session is developer-only and only accepts a Meet l
   assert.match(sql, /v_user\.role not in \('developer','admin'\) then raise exception 'Not allowed'/);
   assert.match(sql, /meet\\\.google\\\.com/);
 });
+
+test("phase 7: no direct ticket update or comment insert policy remains, link check fits Postgres, null-safe raise", () => {
+  const m6 = readFileSync(new URL("../../supabase/migrations/20261008170000_6.sql", import.meta.url), "utf8");
+  assert.match(m6, /drop policy if exists support_tickets_update on support_tickets/);
+  assert.match(m6, /drop policy if exists support_comments_insert on support_comments/);
+  assert.ok(!/\{1,2000\}/.test(m6), "no repetition count above Postgres's limit of 255");
+  assert.match(m6, /\[\^\[:space:\]\]\+/);
+  assert.match(m6, /p_type is null or p_type not in/);
+});
