@@ -58,7 +58,8 @@ export default async function HomePage() {
 
   const teamView = teamRows.map(toRow);
   const assigned = teamView.filter((t, i) => teamRows[i].assignee_id === user.id && t.status !== DONE);
-  const unassigned = teamRows.filter((t) => !t.assignee_id && t.status !== DONE).length;
+  // The same count as the sidebar and the queue's "Unassigned" view.
+  const unassigned = teamRows.filter((t) => !t.assignee_id).length;
   const overdue = teamView.filter((t) => t.overdueHours !== null).length;
   const urgent = teamRows.filter((t) => (t.priority === "P0" || t.priority === "P1") && t.status !== DONE).length;
   const firstName = (user.name || user.email).split(/[\s@]/)[0];

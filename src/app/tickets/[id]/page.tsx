@@ -159,7 +159,8 @@ export default async function TicketPage({ params }: { params: { id: string } })
                   {eventList.map((e) => (
                     <li key={e.id}>
                       <div><strong>{e.actor_name}</strong> {describeEvent(e)}</div>
-                      {e.reason && <div className="muted" style={{ overflowWrap: "anywhere" }}>“{e.reason}”</div>}
+                      {/* Why a ticket is blocked stays with the team. */}
+                      {e.reason && (staff || !(e.event_type === "status_changed" && e.new_value === "Blocked")) && <div className="muted" style={{ overflowWrap: "anywhere" }}>“{e.reason}”</div>}
                       {canChange && e.event_type === "email_failed" && e.new_value && isMailKind(e.new_value) && <RetryEmail ticketId={t.id} kind={e.new_value} />}
                       <div className="hint">{fmtDateTime(e.created_at)}</div>
                     </li>

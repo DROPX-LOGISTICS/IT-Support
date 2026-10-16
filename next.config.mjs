@@ -14,8 +14,8 @@ const nextConfig = {
     }];
   },
   experimental: {
-    // Up to 5 screenshots of 5 MB each, plus form fields.
-    serverActions: { bodySizeLimit: "28mb" },
+    // Screenshots travel with the form: up to 4 MB of files (see src/lib/attachments.ts) plus the fields.
+    serverActions: { bodySizeLimit: "5mb" },
   },
 };
 export default nextConfig;

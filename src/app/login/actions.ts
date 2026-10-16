@@ -22,6 +22,6 @@ export async function signInWithGoogle(formData: FormData) {
 
 export async function signOut() {
   const supabase = userClient();
-  if (supabase) await supabase.auth.signOut();
+  if (supabase) await supabase.auth.signOut({ scope: "local" });
   redirect("/login");
 }

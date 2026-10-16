@@ -17,7 +17,7 @@ async function ctx() {
   const s = await requireUser();
   const supabase = userClient();
   if (s.state !== "ok" || !supabase || !isStaff(s.user.role) || s.user.role === "manager") redirect("/my-tickets");
-  const { data: own } = await supabase.from("support_developers").select("id").eq("user_id", s.user.id).eq("is_active", true).maybeSingle();
+  const { data: own } = await supabase.from("support_developers").select("id").eq("user_id", s.user.id).eq("is_active", true).order("created_at").limit(1).maybeSingle();
   return { supabase, user: s.user, ownDeveloperId: (own?.id as string | undefined) ?? null };
 }
 const back = (date: string, q: string): never => {

@@ -23,4 +23,6 @@ test("bad ticket number, status and date are refused", () => {
   assert.ok(validateDailyRow({ ...good, ticketNumber: "XX-1" }, false).errors.ticketNumber);
   assert.ok(validateDailyRow({ ...good, status: "Idle" }, false).errors.status);
   assert.ok(validateDailyRow({ ...good, targetDate: "next week" }, false).errors.targetDate);
+  assert.ok(validateDailyRow({ ...good, targetDate: "2026-02-30" }, false).errors.targetDate);
+  assert.equal(validateDailyRow({ ...good, targetDate: "2026-02-28" }, false).value.targetDate, "2026-02-28");
 });

@@ -1,5 +1,9 @@
 export const MAX_FILES = 5;
-export const MAX_BYTES = 5 * 1024 * 1024;
+// The files travel with the form in one request, and Vercel refuses a request body over 4.5 MB before
+// the site sees it. So the limit is on the files together, with room left for the form fields.
+export const MAX_TOTAL_BYTES = 4 * 1024 * 1024;
+export const MAX_BYTES = MAX_TOTAL_BYTES;
+export const MAX_MB = MAX_TOTAL_BYTES / 1024 / 1024;
 export const ALLOWED_MIME = ["image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"] as const;
 
 export type FileMeta = { name: string; type: string; size: number };
@@ -8,9 +12,10 @@ export function validateFiles(files: FileMeta[]): string | null {
   if (files.length > MAX_FILES) return `Attach up to ${MAX_FILES} files.`;
   for (const f of files) {
     if (f.size <= 0) return `${f.name} is empty.`;
-    if (f.size > MAX_BYTES) return `${f.name} is larger than 5 MB.`;
+    if (f.size > MAX_BYTES) return `${f.name} is larger than ${MAX_MB} MB.`;
     if (!(ALLOWED_MIME as readonly string[]).includes(f.type)) return `${f.name} must be an image or PDF.`;
   }
+  if (files.reduce((n, f) => n + f.size, 0) > MAX_TOTAL_BYTES) return `The files are larger than ${MAX_MB} MB together. Remove one, or send smaller pictures.`;
   return null;
 }
 

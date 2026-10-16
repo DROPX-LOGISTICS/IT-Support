@@ -35,6 +35,9 @@ test("a reopened ticket's fix clock restarts at the reopen", () => {
   const base = { priority: "P1", status: "Reopened", created_at: hoursAgo(400), first_response_at: hoursAgo(390), confirmed_at: hoursAgo(10) };
   assert.equal(overdueInfo(base, DEFAULT_TARGETS, NOW).fixOverdue, false);
   assert.equal(overdueInfo({ ...base, confirmed_at: hoursAgo(80) }, DEFAULT_TARGETS, NOW).fixOverdue, true);
+  // picking the reopened ticket up again must not put the clock back to the day it was raised
+  assert.equal(overdueInfo({ ...base, status: "In progress" }, DEFAULT_TARGETS, NOW).fixOverdue, false);
+  assert.equal(overdueInfo({ ...base, status: "Blocked", confirmed_at: hoursAgo(80) }, DEFAULT_TARGETS, NOW).fixOverdue, true);
 });
 test("settings form: valid, and each rule refuses", () => {
   const ok = { response_P0: 1, response_P1: 4, response_P2: 24, response_P3: 48, fix_P0: 24, fix_P1: 72, fix_P2: 168, fix_P3: 336, reminder_days: 3, auto_close_days: 7, n_raised: "on", n_status: "on" };

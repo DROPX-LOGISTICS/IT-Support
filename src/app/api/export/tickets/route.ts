@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isStaff } from "@/lib/access";
+import { istDate } from "@/lib/commits";
 import { ticketsCsv } from "@/lib/export-columns";
 import { loadTicketExport } from "@/lib/export-data";
 import { parseQueueFilters } from "@/lib/queue-filters";
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
   return new NextResponse(ticketsCsv(rows), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="tickets-${new Date().toISOString().slice(0, 10)}.csv"`,
+      "Content-Disposition": `attachment; filename="tickets-${istDate(new Date())}.csv"`,
       "Cache-Control": "no-store",
       "X-Content-Type-Options": "nosniff",
     },

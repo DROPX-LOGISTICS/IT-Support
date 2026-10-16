@@ -4,7 +4,7 @@ import { useFormState, useFormStatus } from "react-dom";
 import { AlertTriangle, Bug, FileText, ImagePlus, Lightbulb, LifeBuoy, Loader2, Send, X } from "lucide-react";
 import { raiseTicket, type RaiseState } from "./actions";
 import { PRIORITIES, PRIORITY_HINT, PRIORITY_LABEL, type Priority, type TicketType } from "@/lib/tickets";
-import { MAX_BYTES, MAX_FILES } from "@/lib/attachments";
+import { MAX_BYTES, MAX_FILES, MAX_MB, MAX_TOTAL_BYTES } from "@/lib/attachments";
 
 const TYPES: { value: TicketType; label: string; hint: string; icon: typeof Bug }[] = [
   { value: "bug", label: "Bug", hint: "Something is broken", icon: Bug },
@@ -64,6 +64,9 @@ export function TicketForm(props: { portals: { code: string; name: string }[]; d
     syncFiles(next);
   }
   const tooBig = files.find((f) => f.size > MAX_BYTES);
+  const fileProblem = tooBig
+    ? `${tooBig.name} is larger than ${MAX_MB} MB. Remove it to send.`
+    : files.reduce((n, f) => n + f.size, 0) > MAX_TOTAL_BYTES ? `These files are larger than ${MAX_MB} MB together. Remove one to send.` : "";
 
   return (
     <form action={action} className="stack" noValidate
@@ -134,7 +137,7 @@ export function TicketForm(props: { portals: { code: string; name: string }[]; d
           onDragOver={(ev) => { ev.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
           onDrop={(ev) => { ev.preventDefault(); setOver(false); addFiles(ev.dataTransfer.files); }}>
           <ImagePlus size={22} aria-hidden style={{ verticalAlign: "-5px" }} /> <strong>Drop screenshots here</strong>, paste one, or choose files
-          <div className="hint">Pictures or a PDF. Up to {MAX_FILES} files, 5 MB each.</div>
+          <div className="hint">Pictures or a PDF. Up to {MAX_FILES} files, {MAX_MB} MB in total.</div>
           <input ref={fileInput} type="file" name="files" multiple accept={ACCEPT.join(",")} onChange={(ev) => addFiles(ev.target.files)} />
         </label>
         {files.length > 0 && (
@@ -151,7 +154,7 @@ export function TicketForm(props: { portals: { code: string; name: string }[]; d
           </ul>
         )}
         {skipped && <div className="hint" role="status" style={{ marginTop: 6 }}>Not added: {skipped}.</div>}
-        {(e.files || tooBig) && <div className="err" role="alert">{tooBig ? `${tooBig.name} is larger than 5 MB. Remove it to send.` : e.files}</div>}
+        {(e.files || fileProblem) && <div className="err" role="alert">{fileProblem || e.files}</div>}
       </section>
 
       <section className="card">
@@ -171,7 +174,7 @@ export function TicketForm(props: { portals: { code: string; name: string }[]; d
         <p className="hint" style={{ margin: "10px 0 0" }}>Using a shared station mailbox? Enter your own name so we know who to speak to.</p>
       </section>
 
-      <div className="actions sticky-actions"><span className="hint">You can follow it under My tickets.</span><Submit blocked={Boolean(tooBig)} /></div>
+      <div className="actions sticky-actions"><span className="hint">You can follow it under My tickets.</span><Submit blocked={Boolean(fileProblem)} /></div>
     </form>
   );
 }

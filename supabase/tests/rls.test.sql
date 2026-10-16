@@ -320,4 +320,34 @@ begin
   perform t.as_root();
 end $$;
 
+\echo 13. a ticket with no linked reporter, and internal notes in the history
+do $$
+declare v_id uuid; r record;
+begin
+  perform t.as_root();
+  insert into support_tickets (number, type, portal_id, title, description, priority, status, reporter_name, reporter_email, raised_by_name, source, done_at)
+  select 'BUG-900', 'bug', id, 'Imported', 'From the sheet', 'P2', 'Done – awaiting confirmation', 'Old Reporter', 'old@dropxlogistics.com', 'Old Reporter', 'sheet_import', now()
+  from support_portals where code = 'people' returning id into v_id;
+  -- nobody is the reporter of an imported ticket, so only a developer with a reason may record the answer
+  perform t.as_user(t.u('rb'), 'bina@dropxlogistics.com');
+  perform t.fails(format($q$select support_confirm_ticket(%L, true, null)$q$, v_id), 'Not allowed');
+  perform t.fails(format($q$select support_confirm_ticket(%L, false, 'Still broken')$q$, v_id), 'Not allowed');
+  perform t.as_user(t.u('mg'), 'boss@dropxlogistics.com');
+  perform t.fails(format($q$select support_confirm_ticket(%L, true, 'Looks fine')$q$, v_id), 'Not allowed');
+  perform t.as_user(t.u('d1'), 'dev1@dropxlogistics.com');
+  perform t.fails(format($q$select support_confirm_ticket(%L, true, null)$q$, v_id), 'reason is required');
+  perform t.ok(support_confirm_ticket(v_id, true, 'Confirmed by phone') = 'Closed', 'a developer closes an imported ticket with a reason');
+
+  perform t.as_user(t.u('ra'), 'asha@dropxlogistics.com');
+  select * into r from support_create_ticket('support', 'people', 'History check', 'Please', null, 'P3', null, 'Asha', null);
+  perform t.as_user(t.u('d1'), 'dev1@dropxlogistics.com');
+  perform support_add_comment(r.id, 'Only for the team', true);
+  perform support_add_comment(r.id, 'We are on it', false);
+  perform t.ok(t.count(format('select 1 from support_events where ticket_id = %L and event_type = ''commented''', r.id)) = 2, 'staff see both comment events');
+  perform t.as_user(t.u('ra'), 'asha@dropxlogistics.com');
+  perform t.ok(t.count(format('select 1 from support_events where ticket_id = %L and event_type = ''commented''', r.id)) = 1, 'the reporter does not see that an internal note was added');
+  perform t.ok(t.count(format('select 1 from support_events where ticket_id = %L and event_type = ''created''', r.id)) = 1, 'the reporter still sees the rest of the history');
+  perform t.as_root();
+end $$;
+
 \echo all database checks passed

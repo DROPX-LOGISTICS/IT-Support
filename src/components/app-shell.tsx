@@ -57,7 +57,7 @@ async function loadCounts(user: ShellUser): Promise<NavCounts> {
     const base = () => supabase.from("support_tickets").select("id", { count: "exact", head: true }).is("deleted_at", null);
     const [confirm, unassigned] = await Promise.all([
       base().eq("reporter_id", user.id).eq("status", DONE),
-      isStaff(user.role) ? base().is("assignee_id", null).in("status", ["New", "Viable check", "Reopened"]) : Promise.resolve({ count: 0 }),
+      isStaff(user.role) ? base().is("assignee_id", null).not("status", "in", '("Closed","Not viable")') : Promise.resolve({ count: 0 }),
     ]);
     return { confirm: confirm.count ?? 0, unassigned: unassigned.count ?? 0 };
   } catch {
