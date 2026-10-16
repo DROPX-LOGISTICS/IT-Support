@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CheckCircle2, AlertTriangle } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
+import { AppShell } from "@/components/app-shell";
 import { NotConfigured } from "@/components/ui";
 import { canManageMaster } from "@/lib/access";
 import { requireUser } from "@/lib/session";
@@ -46,9 +46,8 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
   const Field = ({ label, children }: { label: string; children: React.ReactNode }) => <div><label className="field">{label}</label>{children}</div>;
 
   return (
-    <>
-      <AppHeader user={user} />
-      <main className="container" style={{ maxWidth: 900 }}>
+    <AppShell user={user} width="mid">
+        <p className="eyebrow">Admin</p>
         <h1>Master</h1>
         <p className="muted" style={{ margin: "0 0 14px" }}>Portals, repositories, developers and who can do what. Admins only.</p>
         <div className="tabs" style={{ flexWrap: "wrap", margin: "0 0 16px" }}>
@@ -227,7 +226,6 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
             ))}
           </div>
         )}
-      </main>
-    </>
+    </AppShell>
   );
 }

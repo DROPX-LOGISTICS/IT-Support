@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AlertTriangle, CheckCircle2, Download, GitCommit, Info } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
+import { AppShell } from "@/components/app-shell";
 import { DailyRowForm } from "@/components/daily-row-form";
 import { NotConfigured } from "@/components/ui";
 import { SheetsExport } from "@/components/sheets-export";
@@ -53,9 +53,8 @@ export default async function DailyUpdatesPage({ searchParams }: { searchParams:
   const total = n(searchParams.created) + n(searchParams.updated);
 
   return (
-    <>
-      <AppHeader user={user} />
-      <main className="container" style={{ maxWidth: 820 }}>
+    <AppShell user={user}>
+        <p className="eyebrow">Team</p>
         <h1>Daily updates</h1>
         <p className="muted" style={{ margin: "0 0 16px" }}>
           {user.role === "manager" ? "Published updates from the developers." : "Review what was drafted from your commits, add hours and blockers, then publish."}
@@ -142,7 +141,6 @@ export default async function DailyUpdatesPage({ searchParams }: { searchParams:
             <DailyRowForm mode="add" date={date} portals={portals ?? []} row={{ portalId: "", ticketNumber: "", workDone: "", hours: null, status: "In progress", blocker: "", nextStep: "", targetDate: "" }} />
           </section>
         )}
-      </main>
-    </>
+    </AppShell>
   );
 }

@@ -9,8 +9,8 @@ was not done and why (section 3). Nothing here is a secret: values go in the hos
 | # | Item | Where | Status |
 |---|---|---|---|
 | 1 | Create the **staging** Supabase project (never production for testing) | Supabase | pending |
-| 2 | Apply the migrations in order: `20261008120000_1.sql`, `…130000_2.sql`, `…140000_3.sql`, `…150000_4.sql`, `…160000_5.sql`, `…170000_6.sql` | SQL editor or `supabase db push` | pending on Supabase (all six already ran, twice, on a local PostgreSQL 16 with `npm run test:db`) |
-| 3 | Authentication, Providers, Google: enable, paste the Google OAuth client ID and secret | Supabase dashboard | pending |
+| 2 | Apply the migrations in order: `20261008120000_1.sql`, `…130000_2.sql`, `…140000_3.sql`, `…150000_4.sql`, `…160000_5.sql`, `…170000_6.sql`, `20261010120000_7.sql` | SQL editor or `supabase db push` | pending on Supabase (the first six already ran, twice, on a local PostgreSQL 16 with `npm run test:db`; `_7` and its new checks in `rls.test.sql` have **not** been run yet, so run `npm run test:db` before applying) |
+| 3 | Authentication, Providers, Google: enable, paste the Google OAuth client ID and secret. Keep **Confirm email** on (or switch the Email provider off): the site trusts the email in the sign-in token | Supabase dashboard | pending |
 | 4 | Authentication, URL Configuration: Site URL = `APP_URL`; redirect URLs `APP_URL/auth/callback`, `http://localhost:3000/auth/callback` | Supabase dashboard | pending |
 | 5 | Google Cloud: OAuth client (Web) for sign-in, redirect URI `https://<project-ref>.supabase.co/auth/v1/callback`; consent screen **Internal** | Google Cloud | pending |
 | 6 | Deploy on Vercel; add the domain `support.dropxlogistics.com`; confirm both crons appear | Vercel, DNS | pending |
@@ -69,13 +69,16 @@ being admin-only; 20 simultaneous raises get 20 different numbers. This testing 
 6. **Sheet screenshot links** are kept as links on imported tickets (staff see them); the files are not downloaded into storage, because the links are private Drive files I cannot read.
 7. **Editing a published daily update.** Published rows are final by design; there is no "reopen to edit". Say if you want one.
 8. **Auto-close email.** The spec's email table has no auto-close notice, so none is sent; the ticket history shows it.
+9. **Screenshots of 5 MB each** (spec). Vercel refuses any request over 4.5 MB, and the files travel with the form, so the limit is now 4 MB for all files of a ticket together, checked in the form before sending. The spec's 5 files of 5 MB each needs the browser to upload straight to storage; say if you want that built.
 
 ## 4. Decisions taken that you may want to revisit
 
 - Overdue is measured in wall-clock hours; a reopened ticket's fix clock restarts at the reopen; a ticket waiting for the reporter is never overdue.
 - The overdue queue filter is worked out in the app from up to 1000 open tickets, not in SQL.
 - Summary averages cover tickets raised in the last 90 days; "closed per week" uses the closing date; weeks start Monday (IST).
-- Blocked reasons stay internal (not emailed). Managers can see the board and summary but not move tickets.
+- Blocked reasons stay internal: not emailed, and hidden from the reporter in the ticket history. Managers can see the board and summary but not move tickets.
+- If the reminder email cannot be sent at all (email not configured), a ticket is still closed automatically after the auto-close days.
+- A person whose Supabase sign-in account is deleted and created again cannot sign in until an admin clears `auth_user_id` on their `support_users` row.
 - The person who did an action is not emailed about it (except the reporter's own acknowledgement).
 - The reminder is sent once per wait for confirmation; if it cannot be sent it is retried the next day.
 - Auto-close is recorded as closed by the system (`auto_closed`), never as a reporter confirmation.
@@ -91,7 +94,19 @@ being admin-only; 20 simultaneous raises get 20 different numbers. This testing 
 - Keep the Google consent screen **Internal**. After first sign-in, review People & access.
 - Add backups and retention, error monitoring, rate limiting on raising tickets, and a content security policy review before a wide launch.
 
-## 6. Other details
+## 6. Current deployment (temporary, Cloudflare)
+
+- **Site**: `https://dropx-it-support.withered-voice-1c40.workers.dev`, a Cloudflare Worker named `dropx-it-support` in the Tech@dropxlogistics.com account. Redeploy with `npm run cf:build`, then `OPEN_NEXT_DEPLOY=true npx wrangler deploy` (on Windows `npm run cf:deploy` fails on a path bug in the adapter).
+- **Database**: the `uimajyffojydenqsegjv` Supabase project, shared with HRMS and the dashboard. All seven migrations were applied on 10 Oct 2026 with `supabase db query`, after a rehearsal in a rolled-back transaction that ran them twice plus `rls.test.sql`. They are **not** recorded in that project's migration history table, which belongs to HRMS, so never run `supabase db push` from this repo against it.
+- **Set on the worker**: `APP_URL`, `ALLOWED_EMAIL_DOMAIN`, `ADMIN_EMAILS` (tech@dropxlogistics.com), `SUPABASE_URL` in `wrangler.jsonc`; `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET` as secrets. Email, GitHub and Google Calendar/Sheets are not set.
+- **Still needed for sign-in**: add `https://dropx-it-support.withered-voice-1c40.workers.dev/auth/callback` under Supabase, Authentication, URL Configuration, Redirect URLs.
+- **Jobs**: Cloudflare cron triggers in `wrangler.jsonc` call the same two routes at the same times as `vercel.json` (see `cloudflare-worker.mjs`).
+- **Moving to Vercel later**: `vercel.json` is untouched. Set the same variables there, add the Vercel address to the Supabase redirect URLs, change `APP_URL`, then delete the worker.
+
+## 7. Other details
+
+- **Design**: the site uses the DropX look shared with People and OpsPulse (logo, sidebar, amber-to-orange brand), with a bottom bar on phones and a dark theme that follows the device.
+- **Design preview** (development only): `npm run dev`, then open `/dev/preview`. It shows the real components with made-up tickets and needs no database. It returns "not found" in a production build.
 
 - **Phase 5** (yours): `https://support.dropxlogistics.com/new?portal=<code>&page=<encoded page URL>`; codes `people`, `opspulse`, `dropx-one`, `dashboard`, `connect`, `delivery-tracker`.
 - **Import** (`npm run import:sheet`): dry run by default, `--apply` to write; flexible column names matched without seeing your real sheet, so read the dry-run report first.

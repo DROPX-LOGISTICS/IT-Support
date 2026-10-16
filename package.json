@@ -10,7 +10,9 @@
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --no-warnings --test \"src/**/*.test.mjs\"",
     "import:sheet": "node --experimental-strip-types --no-warnings scripts/import-sheet.mjs",
-    "test:db": "bash supabase/tests/run.sh"
+    "test:db": "bash supabase/tests/run.sh",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:deploy": "opennextjs-cloudflare build && wrangler deploy"
   },
   "engines": {
     "node": ">=22.6"
@@ -26,11 +28,13 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "1.8.5",
     "@types/node": "^22.20.5",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "eslint": "^8.57.1",
     "eslint-config-next": "^14.2.35",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "wrangler": "4.96.0"
   }
 }

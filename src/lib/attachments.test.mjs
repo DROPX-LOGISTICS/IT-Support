@@ -3,12 +3,17 @@ import assert from "node:assert/strict";
 import { safeFileName, sniffMime, storagePath, validateFiles } from "./attachments.ts";
 
 const f = (name, type, size) => ({ name, type, size });
-test("allows up to five images or PDFs of at most 5 MB", () => {
-  assert.equal(validateFiles([f("a.png", "image/png", 1000), f("b.pdf", "application/pdf", 5 * 1024 * 1024)]), null);
+const MB = 1024 * 1024;
+test("allows up to five images or PDFs of at most 4 MB together", () => {
+  assert.equal(validateFiles([f("a.png", "image/png", 1000), f("b.pdf", "application/pdf", 4 * MB - 1000)]), null);
+  assert.equal(validateFiles(Array.from({ length: 5 }, () => f("a.png", "image/png", 0.8 * MB))), null);
+});
+test("refuses files that together would be more than one request can carry", () => {
+  assert.match(validateFiles([f("a.png", "image/png", 3 * MB), f("b.png", "image/png", 2 * MB)]), /together/);
 });
 test("refuses a sixth file, big files, empty files and other types", () => {
   assert.ok(validateFiles(Array.from({ length: 6 }, () => f("a.png", "image/png", 10))));
-  assert.ok(validateFiles([f("a.png", "image/png", 5 * 1024 * 1024 + 1)]));
+  assert.match(validateFiles([f("a.png", "image/png", 4 * MB + 1)]), /a\.png is larger than 4 MB/);
   assert.ok(validateFiles([f("a.png", "image/png", 0)]));
   assert.ok(validateFiles([f("a.exe", "application/x-msdownload", 10)]));
   assert.ok(validateFiles([f("a.svg", "image/svg+xml", 10)]));

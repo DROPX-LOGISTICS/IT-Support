@@ -13,16 +13,23 @@ export async function GET(request: NextRequest) {
   const next = safeNext(request.nextUrl.searchParams.get("next"));
   const supabase = userClient();
   if (!supabase) return to("/login?error=unconfigured");
-  if (!code) return to("/login?error=failed");
+  if (!code) {
+    // Supabase explains a refused sign-in in the address; it goes to the server log, never to the person.
+    console.error("sign-in: no code", request.nextUrl.searchParams.get("error_code"), request.nextUrl.searchParams.get("error_description"));
+    return to("/login?error=failed");
+  }
 
   const { data, error } = await supabase.auth.exchangeCodeForSession(code);
   const user = data?.user;
-  if (error || !user) return to("/login?error=failed");
+  if (error || !user) {
+    console.error("sign-in: code exchange failed", error?.status, error?.code, error?.message);
+    return to("/login?error=failed");
+  }
 
   // Domain is checked here on the server, on the verified email, whatever the account picker showed.
   const verified = Boolean(user.email_confirmed_at) || user.user_metadata?.email_verified === true;
   if (!isAllowedEmail(user.email, allowedDomain(), verified)) {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     return to("/login?error=domain");
   }
 
@@ -30,11 +37,12 @@ export async function GET(request: NextRequest) {
   const name = String(meta.full_name ?? meta.name ?? "").slice(0, 100);
   const { data: row, error: regError } = await supabase.rpc("support_register_user", { p_name: name });
   if (regError || !row) {
-    await supabase.auth.signOut();
+    console.error("sign-in: registration failed", regError?.code, regError?.message);
+    await supabase.auth.signOut({ scope: "local" });
     return to("/login?error=failed");
   }
   if (!row.is_active) {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
     return to("/login?error=inactive");
   }
 

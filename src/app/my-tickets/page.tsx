@@ -1,10 +1,12 @@
 import Link from "next/link";
-import { CheckCircle2, Inbox, PlusCircle } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
+import { CalendarClock, CheckCircle2, Clock, Inbox, PlusCircle } from "lucide-react";
+import { AppShell } from "@/components/app-shell";
 import { ConfirmBar } from "@/components/confirm-bar";
 import { NotConfigured, PriorityPill, StatusBadge } from "@/components/ui";
+import { fmtDate } from "@/lib/format";
 import { requireUser } from "@/lib/session";
 import { userClient } from "@/lib/supabase/server";
+import { DONE } from "@/lib/status-flow";
 import { OPEN_STATUSES, TYPE_LABEL, type Priority, type Status, type TicketType } from "@/lib/tickets";
 
 export const dynamic = "force-dynamic";
@@ -14,8 +16,6 @@ type Row = {
   expected_date: string | null; developer_update: string | null; created_at: string;
   portal: { name: string } | null;
 };
-
-const fmt = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 
 export default async function MyTicketsPage({ searchParams }: { searchParams: { show?: string; raised?: string; files?: string } }) {
   const session = await requireUser();
@@ -33,65 +33,65 @@ export default async function MyTicketsPage({ searchParams }: { searchParams: { 
     .order("created_at", { ascending: false })
     .limit(200)
     .returns<Row[]>();
-  const rows = (data ?? []).filter((r) => show === "all" || (OPEN_STATUSES as readonly string[]).includes(r.status));
+  const all = data ?? [];
+  const open = all.filter((r) => (OPEN_STATUSES as readonly string[]).includes(r.status));
+  // Tickets waiting for this person's answer come first.
+  const rows = (show === "all" ? all : open).slice().sort((a, b) => Number(b.status === DONE) - Number(a.status === DONE));
   const raised = /^(BUG|FR|SUP)-\d{3,}$/.test(searchParams.raised ?? "") ? searchParams.raised : null;
 
   return (
-    <>
-      <AppHeader user={user} />
-      <main className="container">
-        <div className="page-head">
+    <AppShell user={user}>
+      <div className="page-head">
+        <div>
+          <h1>My tickets</h1>
+          <p className="muted">Everything you have reported, and where it stands.</p>
+        </div>
+        <Link className="btn" href="/new"><PlusCircle size={18} aria-hidden /> Raise a ticket</Link>
+      </div>
+
+      {raised && (
+        <div className="banner ok" role="status">
+          <CheckCircle2 size={18} aria-hidden />
           <div>
-            <h1>My tickets</h1>
-            <p className="muted" style={{ margin: 0 }}>Everything you have reported, and where it stands.</p>
+            <strong>{raised}</strong> is raised. We will update this page as the team works on it.
+            {searchParams.files === "failed" && " Some screenshots could not be uploaded, so please send them again later."}
           </div>
-          <Link className="btn" href="/new"><PlusCircle size={18} aria-hidden /> Raise a ticket</Link>
         </div>
+      )}
+      {error && <div className="banner bad" role="alert">We could not load your tickets. Please refresh.</div>}
 
-        {raised && (
-          <div className="banner ok" role="status" style={{ marginTop: 18 }}>
-            <CheckCircle2 size={18} aria-hidden />
-            <div>
-              <strong>{raised}</strong> is raised. We will update this page as the team works on it.
-              {searchParams.files === "failed" && " Some screenshots could not be uploaded, so please send them again later."}
+      <div className="tabs">
+        <Link href="/my-tickets" aria-current={show === "open"}>Open <small>{open.length}</small></Link>
+        <Link href="/my-tickets?show=all" aria-current={show === "all"}>All <small>{all.length}</small></Link>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="card empty">
+          <div className="icon"><Inbox size={26} aria-hidden /></div>
+          <h2>{show === "open" ? "Nothing open right now" : "No tickets yet"}</h2>
+          <p className="muted" style={{ margin: "4px 0 16px" }}>Something not working, or an idea that would help? Tell us.</p>
+          <Link className="btn" href="/new">Raise a ticket</Link>
+        </div>
+      ) : (
+        rows.map((t) => (
+          <article key={t.id} className={`card ticket${t.status === DONE ? " needs" : ""}`}>
+            <div className="ticket-top">
+              <span className="num">{t.number}</span>
+              <StatusBadge status={t.status} />
+              <PriorityPill priority={t.priority} />
             </div>
-          </div>
-        )}
-        {error && <div className="banner bad" role="alert" style={{ marginTop: 18 }}>We could not load your tickets. Please refresh.</div>}
-
-        <div className="tabs" role="tablist">
-          <Link href="/my-tickets" aria-current={show === "open"}>Open</Link>
-          <Link href="/my-tickets?show=all" aria-current={show === "all"}>All</Link>
-        </div>
-
-        {rows.length === 0 ? (
-          <div className="card empty">
-            <div className="icon"><Inbox size={26} aria-hidden /></div>
-            <h2>{show === "open" ? "Nothing open right now" : "No tickets yet"}</h2>
-            <p className="muted" style={{ margin: "4px 0 16px" }}>Something not working, or an idea that would help? Tell us.</p>
-            <Link className="btn" href="/new">Raise a ticket</Link>
-          </div>
-        ) : (
-          rows.map((t) => (
-            <article key={t.id} className="card ticket" style={t.status === "Done – awaiting confirmation" ? { borderColor: "var(--brand)" } : undefined}>
-              <div className="ticket-top">
-                <span className="num">{t.number}</span>
-                <StatusBadge status={t.status} />
-                <PriorityPill priority={t.priority} />
-              </div>
-              <h2><Link href={`/tickets/${t.id}`}>{t.title}</Link></h2>
-              <div className="meta">
-                <span>{TYPE_LABEL[t.type]}</span>
-                {t.portal && <span>{t.portal.name}</span>}
-                <span>Raised {fmt(t.created_at)}</span>
-                {t.expected_date && <span>Expected {fmt(t.expected_date)}</span>}
-              </div>
-              {t.developer_update && <div className="update"><strong>Latest update: </strong>{t.developer_update}</div>}
-              {t.status === "Done – awaiting confirmation" && <div className="update" style={{ background: "var(--brand-soft)" }}><ConfirmBar ticketId={t.id} /></div>}
-            </article>
-          ))
-        )}
-      </main>
-    </>
+            <h2><Link href={`/tickets/${t.id}`}>{t.title}</Link></h2>
+            <div className="meta">
+              <span>{TYPE_LABEL[t.type]}</span>
+              {t.portal && <span>{t.portal.name}</span>}
+              <span><Clock size={13} aria-hidden /> Raised {fmtDate(t.created_at)}</span>
+              {t.expected_date && <span><CalendarClock size={13} aria-hidden /> Expected {fmtDate(t.expected_date)}</span>}
+            </div>
+            {t.developer_update && <div className="update"><strong>Latest update: </strong>{t.developer_update}</div>}
+            {t.status === DONE && <div className="update ask"><ConfirmBar ticketId={t.id} /></div>}
+          </article>
+        ))
+      )}
+    </AppShell>
   );
 }

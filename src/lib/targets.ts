@@ -36,7 +36,8 @@ const OPEN: Status[] = ["New", "Viable check", "In progress", "Blocked", "Reopen
 export function overdueInfo(t: TargetTicket, targets: Targets, now: Date) {
   if (!OPEN.includes(t.status)) return { overdue: false, respondOverdue: false, fixOverdue: false, hoursOver: 0 };
   const created = new Date(t.created_at).getTime();
-  const fixStart = t.status === "Reopened" && t.confirmed_at ? new Date(t.confirmed_at).getTime() : created;
+  // An open ticket only has a confirmation time when the reporter reopened it, so the restart also holds once work resumes.
+  const fixStart = t.confirmed_at ? Math.max(created, new Date(t.confirmed_at).getTime()) : created;
   const respondBy = created + targets.response[t.priority] * HOUR;
   const fixBy = fixStart + targets.fix[t.priority] * HOUR;
   const respondOverdue = !t.first_response_at && now.getTime() > respondBy;

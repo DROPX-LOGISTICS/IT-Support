@@ -62,7 +62,7 @@ ever written to code, migrations or logs.
 ## Database
 
 Migrations live in `supabase/migrations/<UTC timestamp>_<n>.sql` and are safe to re-run.
-Apply `20261008120000_1.sql`, `…130000_2.sql`, `…140000_3.sql`, `…150000_4.sql`, `…160000_5.sql`, then `…170000_6.sql`, with the Supabase SQL editor, or `supabase db push` against
+Apply `20261008120000_1.sql`, `…130000_2.sql`, `…140000_3.sql`, `…150000_4.sql`, `…160000_5.sql`, `…170000_6.sql`, then `20261010120000_7.sql`, with the Supabase SQL editor, or `supabase db push` against
 the **development** project. It creates only objects prefixed `support_`: 11 tables,
 functions, triggers, policies and one private storage bucket (`support_attachments`).
 It seeds the six portal names (only People has a site URL) and one settings row.

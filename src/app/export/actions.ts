@@ -1,6 +1,6 @@
 "use server";
 import { isStaff } from "@/lib/access";
-import { isDateString, previousIstDate } from "@/lib/commits";
+import { isDateString, istDate, previousIstDate } from "@/lib/commits";
 import { dailyCells, DAILY_HEADER, ticketCells, TICKET_HEADER } from "@/lib/export-columns";
 import { exportRange, loadDailyExport, loadTicketExport } from "@/lib/export-data";
 import { calendarErrorMessage } from "@/lib/google-calendar";
@@ -20,7 +20,7 @@ export async function exportToSheets(_p: SheetResult, fd: FormData): Promise<She
   if (!isStaff(s.user.role)) return { ok: false, message: "You are not allowed to export." };
   const status = sheetsStatus();
   if (!status.configured) return { ok: false, message: "Google Sheets export is not set up yet. Download the CSV instead." };
-  const today = new Date().toISOString().slice(0, 10);
+  const today = istDate(new Date());
   try {
     if (str(fd, "kind") === "daily") {
       const range = exportRange(isDateString, previousIstDate(new Date()), str(fd, "from") || null, str(fd, "to") || null);

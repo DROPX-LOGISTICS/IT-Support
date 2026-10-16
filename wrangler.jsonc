@@ -1,0 +1,19 @@
+{
+  // Cloudflare Workers deployment (temporary host). Secrets are set with `wrangler secret put`, never here.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dropx-it-support",
+  "account_id": "ab2dba58727809ae8bf0a21edb5fe7b8",
+  "main": "cloudflare-worker.mjs",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "observability": { "enabled": true },
+  // Same times as vercel.json (UTC): daily updates 03:30, reminders and auto-close 04:00.
+  "triggers": { "crons": ["30 3 * * *", "0 4 * * *"] },
+  "vars": {
+    "APP_URL": "https://dropx-it-support.withered-voice-1c40.workers.dev",
+    "ALLOWED_EMAIL_DOMAIN": "dropxlogistics.com",
+    "ADMIN_EMAILS": "tech@dropxlogistics.com",
+    "SUPABASE_URL": "https://uimajyffojydenqsegjv.supabase.co"
+  }
+}

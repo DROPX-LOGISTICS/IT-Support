@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { canChangeTicket } from "@/lib/access";
 import { appUrl } from "@/lib/config";
 import { isMailKind } from "@/lib/email-content";
-import { calendarErrorMessage, calendarStatus, createMeetEvent, rescheduleEvent } from "@/lib/google-calendar";
+import { calendarErrorMessage, calendarStatus, cancelEvent, createMeetEvent, rescheduleEvent } from "@/lib/google-calendar";
+import { isDateString } from "@/lib/commits";
 import { istLocalToIso, parseMeetLink } from "@/lib/meet";
 import { cancelMeetForTicket } from "@/lib/meet-server";
 import { notify, retryEmail } from "@/lib/notifications";
@@ -93,7 +94,7 @@ export async function saveDetails(_p: ActionResult, fd: FormData): Promise<Actio
   patch.assignee_id = assignee || null;
   patch.priority = str(fd.get("priority"));
   const date = str(fd.get("expectedDate"));
-  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, message: "Enter a valid date." };
+  if (date && !isDateString(date)) return { ok: false, message: "Enter a valid date." };
   patch.expected_date = date || null;
   patch.developer_update = str(fd.get("developerUpdate")).slice(0, 2000);
   patch.links = str(fd.get("links")).split(/\s+/).filter(Boolean).slice(0, 20);
@@ -212,7 +213,11 @@ export async function createMeetSession(_p: ActionResult, fd: FormData): Promise
       guests: [...new Set([t.reporter_email, asg?.email].filter((e): e is string => Boolean(e)))],
     }, randomUUID());
     const { error } = await ctx.supabase.rpc("support_save_meet_event", { p_ticket: id, p_event_id: ev.eventId, p_link: ev.meetLink, p_at: input.at });
-    if (error) return { ok: false, message: friendly(error.message) };
+    if (error) {
+      // The ticket did not take the session, so the event must not stay on the guests' calendars.
+      await cancelEvent(cal.organizer, ev.eventId).catch(() => {});
+      return { ok: false, message: friendly(error.message) };
+    }
   } catch (e) {
     return { ok: false, message: calendarErrorMessage(e) };
   }

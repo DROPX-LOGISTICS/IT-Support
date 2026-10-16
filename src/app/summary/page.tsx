@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
-import { AppHeader } from "@/components/app-header";
+import { AppShell } from "@/components/app-shell";
 import { NotConfigured } from "@/components/ui";
 import { fmtHours } from "@/lib/hours";
 import { requireUser } from "@/lib/session";
 import { userClient } from "@/lib/supabase/server";
-import { buildSummary, type SummaryTicket } from "@/lib/summary";
+import { AlarmClock, Hourglass, Inbox, RefreshCcw, Reply, Wrench } from "lucide-react";
+import { AWAITING_DAYS, buildSummary, type SummaryTicket } from "@/lib/summary";
 import { loadSettings } from "@/lib/targets-server";
 import { PRIORITIES, PRIORITY_LABEL, type Priority } from "@/lib/tickets";
 import { fmtDate } from "@/lib/format";
@@ -31,22 +32,22 @@ export default async function SummaryPage() {
   const maxPrio = Math.max(1, ...PRIORITIES.map((p) => s.openByPriority[p]));
 
   return (
-    <>
-      <AppHeader user={user} />
-      <main className="container stack" style={{ maxWidth: 980 }}>
+    <AppShell user={user} width="mid">
+      <div className="stack">
         <div>
+          <p className="eyebrow">Insights</p>
           <h1>Summary</h1>
           <p className="muted" style={{ margin: 0 }}>How the team is doing. Averages cover tickets raised in the last 90 days.</p>
         </div>
         {error && <div className="banner bad" role="alert">We could not load the numbers. Please refresh.</div>}
 
         <div className="kpis">
-          <div className="kpi"><div className="v">{s.openTotal}</div><div className="l">Open tickets</div></div>
-          <div className={`kpi${s.overdue.count ? " bad" : ""}`}><div className="v">{s.overdue.count}</div><div className="l">Overdue</div></div>
-          <div className="kpi"><div className="v">{fmtHours(s.avgFirstResponseHours)}</div><div className="l">Average first response</div></div>
-          <div className="kpi"><div className="v">{fmtHours(s.avgFixHours)}</div><div className="l">Average time to fix{s.medianFixHours !== null ? ` (median ${fmtHours(s.medianFixHours)})` : ""}</div></div>
-          <div className="kpi"><div className="v">{s.reopens.rate === null ? "No data" : `${s.reopens.rate}%`}</div><div className="l">Reopened ({s.reopens.total} time{s.reopens.total === 1 ? "" : "s"})</div></div>
-          <div className={`kpi${s.awaiting.length ? " warn" : ""}`}><div className="v">{s.awaiting.length}</div><div className="l">Waiting over 3 days for the reporter</div></div>
+          <Link className="kpi brand" href="/queue"><div className="ic"><Inbox size={17} aria-hidden /></div><div className="v">{s.openTotal}</div><div className="l">Open tickets</div></Link>
+          <Link className={`kpi${s.overdue.count ? " bad" : " good"}`} href="/queue?overdue=1"><div className="ic"><AlarmClock size={17} aria-hidden /></div><div className="v">{s.overdue.count}</div><div className="l">Overdue</div></Link>
+          <div className="kpi"><div className="ic"><Reply size={17} aria-hidden /></div><div className="v">{fmtHours(s.avgFirstResponseHours)}</div><div className="l">Average first response</div></div>
+          <div className="kpi"><div className="ic"><Wrench size={17} aria-hidden /></div><div className="v">{fmtHours(s.avgFixHours)}</div><div className="l">Average time to fix{s.medianFixHours !== null ? ` (median ${fmtHours(s.medianFixHours)})` : ""}</div></div>
+          <div className="kpi"><div className="ic"><RefreshCcw size={17} aria-hidden /></div><div className="v">{s.reopens.rate === null ? "No data" : `${s.reopens.rate}%`}</div><div className="l">Reopened ({s.reopens.total} time{s.reopens.total === 1 ? "" : "s"})</div></div>
+          <div className={`kpi${s.awaiting.length ? " warn" : ""}`}><div className="ic"><Hourglass size={17} aria-hidden /></div><div className="v">{s.awaiting.length}</div><div className="l">Waiting over {AWAITING_DAYS} days for the reporter</div></div>
         </div>
 
         <section className="card">
@@ -107,7 +108,7 @@ export default async function SummaryPage() {
             </table></div>
           )}
         </section>
-      </main>
-    </>
+      </div>
+    </AppShell>
   );
 }

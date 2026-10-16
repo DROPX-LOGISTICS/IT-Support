@@ -1,3 +1,5 @@
+import { isDateString } from "./commits.ts";
+
 export type DailyRowInput = {
   portalId: string; ticketNumber: string; workDone: string; hours: number | null;
   status: "In progress" | "Done" | "Blocked"; blocker: string; nextStep: string; targetDate: string | null;
@@ -33,7 +35,7 @@ export function validateDailyRow(raw: Record<string, unknown>, publishing: boole
   if (nextStep.length > 2000) errors.nextStep = "Keep it under 2000 characters.";
   let targetDate: string | null = null;
   if (targetText) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(targetText)) errors.targetDate = "Enter a valid date.";
+    if (!isDateString(targetText)) errors.targetDate = "Enter a real date as YYYY-MM-DD.";
     else targetDate = targetText;
   }
   if (Object.keys(errors).length) return { ok: false, errors };
