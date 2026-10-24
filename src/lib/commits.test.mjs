@@ -91,7 +91,7 @@ test("groups per developer, portal and ticket, with unlinked commits per portal"
   assert.deepEqual(bug.shas, ["a", "c"]);
   assert.equal(bug.status, "In progress");
   assert.equal(r.rows.find((x) => x.ticketId === "t7").status, "Done");
-  assert.equal(r.rows.find((x) => x.ticketId === null).workDone, "Tidy styles.");
+  assert.equal(r.rows.find((x) => x.ticketId === null).workDone, "• Tidy styles.");
 });
 test("merge commits are skipped; unmatched authors are listed; ticket numbers that do not exist are ignored", () => {
   const r = buildDrafts(base([
@@ -124,7 +124,7 @@ test("running twice does not duplicate rows or overwrite edits; new commits are 
   const second = buildDrafts(base([commit({ sha: "a", message: "Fix payout" }), commit({ sha: "b", message: "Add export" })], { alreadyLogged }));
   const p2 = planUpserts(second.rows, existing);
   assert.equal(p2.inserts.length, 0);
-  assert.deepEqual(p2.updates, [{ id: "r1", workDone: "Fix payout. Tested on staging. Add export.", shas: ["a", "b"] }]);
+  assert.deepEqual(p2.updates, [{ id: "r1", workDone: "Fix payout. Tested on staging.\n• Add export.", shas: ["a", "b"] }]);
   const third = buildDrafts(base([commit({ sha: "a", message: "Fix payout" }), commit({ sha: "b", message: "Add export" })], { alreadyLogged: new Map([["d1", new Set(["a", "b"])]]) }));
   assert.deepEqual(planUpserts(third.rows, existing), { inserts: [], updates: [] });
 });

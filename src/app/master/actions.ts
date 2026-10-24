@@ -75,10 +75,19 @@ export async function updateRepo(fd: FormData) {
   const { supabase } = await admin();
   const id = str(fd, "id");
   const portalId = str(fd, "portalId");
-  const gitRef = cleanGitRef(str(fd, "gitRef"));
+  const source = parseRepoLocator(str(fd, "repo"));
   if (!UUID.test(id) || !UUID.test(portalId)) done("repos", "Choose a portal.", false);
+  if (!source.ok) done("repos", "Enter a repository as owner/name or a GitHub /tree/branch URL.", false);
+  const repo = source.ok ? source.value.repo : "";
+  const gitRef = cleanGitRef(str(fd, "gitRef") || (source.ok ? source.value.gitRef ?? "" : ""));
   if (!gitRef.ok) done("repos", "Enter a valid Git branch, tag or commit ref.", false);
-  const { error } = await supabase.from("support_portal_repos").update({ portal_id: portalId, git_ref: gitRef.ok ? gitRef.value : null, path_prefixes: parsePrefixes(str(fd, "prefixes")) }).eq("id", id);
+  const repoPattern = repo.replace(/[\\%_]/g, "\\$&");
+  let duplicate = supabase.from("support_portal_repos").select("id", { head: true, count: "exact" }).eq("portal_id", portalId).ilike("repo", repoPattern).neq("id", id);
+  duplicate = gitRef.ok && gitRef.value ? duplicate.eq("git_ref", gitRef.value) : duplicate.is("git_ref", null);
+  const { count, error: duplicateError } = await duplicate;
+  if (duplicateError) done("repos", "Could not check the repository mapping.", false);
+  if (count) done("repos", "That repository branch is already linked to this portal.", false);
+  const { error } = await supabase.from("support_portal_repos").update({ repo, portal_id: portalId, git_ref: gitRef.ok ? gitRef.value : null, path_prefixes: parsePrefixes(str(fd, "prefixes")) }).eq("id", id);
   done("repos", error ? "Could not save the repository." : "Repository saved.", !error);
 }
 

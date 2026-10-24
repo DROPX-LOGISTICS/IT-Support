@@ -54,6 +54,7 @@ what is missing. Use a **development** Supabase project, never production.
 | `GOOGLE_CALENDAR_ORGANIZER` | Calendar | The mailbox that owns the Meet events, e.g. `tech@dropxlogistics.com` (the service account acts as this person) |
 | `GOOGLE_SHEETS_OWNER` | Sheets (optional) | The mailbox that owns exported sheets; defaults to `GOOGLE_CALENDAR_ORGANIZER` |
 | `GITHUB_TOKEN`, optional `GITHUB_TOKEN_NISAR_DROPX`, `GITHUB_TOKEN_DROPX_LOGISTICS` | Daily updates (a repo uses its owner's token if set, else `GITHUB_TOKEN`; the repos sit under two owners) | GitHub, Settings, Developer settings, Fine-grained token. Resource owner: each organisation/user that owns a listed repo (create one token per owner if needed); repositories: the listed ones; permissions: **Contents: read-only** and **Metadata: read-only**. Nothing else. Without it the page says "GitHub is not configured" and manual rows still work |
+| `GEMINI_API_KEY`, optional `GEMINI_MODEL` | AI polishing for daily updates | Optional environment fallback. Prefer entering a Google AI Studio key under **Master → Integrations**; the default model is `gemini-3.5-flash` |
 | `CRON_SECRET` | Daily job | Any long random string (`openssl rand -hex 32`). On Vercel, set it as an environment variable: Vercel then sends it as `Authorization: Bearer <secret>` to the cron route |
 
 On Vercel add them under Project Settings, Environment Variables. Nothing secret is
@@ -61,13 +62,14 @@ ever written to code, migrations or logs.
 
 ## Connect integrations from the dashboard
 
-Admins can configure Google Workspace and GitHub under **Master → Integrations**. The worker stores OAuth app credentials and provider tokens encrypted in a dedicated Cloudflare KV namespace; the encryption key remains a Worker secret.
+Admins can configure Google Workspace, GitHub and Gemini AI under **Master → Integrations**. The worker stores OAuth credentials, provider tokens and the Gemini API key encrypted in a dedicated Cloudflare KV namespace; the encryption key remains a Worker secret.
 
 1. In Google Cloud, create a Web OAuth client and add the callback URL shown on the Google Workspace card. Enable Gmail, Calendar, Sheets and Drive APIs. Save its client ID and secret in the card, then click **Connect Google** and sign in as `tech@dropxlogistics.com`.
 2. In GitHub, create an OAuth App and add the callback URL shown on the GitHub card. Save its client ID and secret, click **Connect GitHub**, and authorize access to the required private repositories. Organization SSO may also need approval.
-3. Use **Test connection** after connecting. Disconnect removes provider tokens while retaining the OAuth app configuration.
+3. In Google AI Studio, create a restricted Gemini API key. Save it on the Gemini AI card; the dashboard stores it encrypted and tests the selected model before reporting it ready.
+4. Use **Test connection** after connecting. Disconnect removes provider tokens while retaining the OAuth app configuration.
 
-The dashboard flow replaces `GMAIL_REFRESH_TOKEN` and `GITHUB_TOKEN` for normal operation. Environment credentials remain supported as a fallback. A Google Workspace service account remains supported for unattended Calendar and Sheets access.
+The dashboard flow replaces `GMAIL_REFRESH_TOKEN`, `GITHUB_TOKEN` and `GEMINI_API_KEY` for normal operation. Environment credentials remain supported as a fallback. A Google Workspace service account remains supported for unattended Calendar and Sheets access.
 
 ## Database
 

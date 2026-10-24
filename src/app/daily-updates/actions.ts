@@ -5,6 +5,8 @@ import { isStaff } from "@/lib/access";
 import { isDateString, previousIstDate } from "@/lib/commits";
 import { draftFromCommits } from "@/lib/daily-draft";
 import { validateDailyRow, type DailyRowErrors } from "@/lib/daily-row";
+import { refineDailyWorkDone } from "@/lib/gemini";
+import { geminiRuntimeConfigured, noteGeminiCheck } from "@/lib/integrations";
 import { requireUser } from "@/lib/session";
 import { userClient } from "@/lib/supabase/server";
 
@@ -40,6 +42,69 @@ export async function draftFromCommitsAction(fd: FormData) {
   const run = await draftFromCommits({ db: supabase, date, onlyDeveloperId: ownDeveloperId!, recordUnmatched: false });
   if (!run.configured) back(date, "notice=nogithub");
   if (run.configured) back(date, `created=${run.created}&updated=${run.updated}&unmatched=${run.unmatched}&noportal=${run.noPortal}&errors=${run.errors.length}`);
+}
+
+type AiDraft = { id: string; developer_id: string; update_date: string; work_done: string; state: string };
+const MAX_AI_ROWS = 8;
+
+const canEditAiDraft = (row: AiDraft, user: { role: string }, ownDeveloperId: string | null) =>
+  row.state === "draft" && (user.role === "admin" || row.developer_id === ownDeveloperId);
+
+async function recordGeminiCheck(error?: string) {
+  try { await noteGeminiCheck(error); }
+  catch { /* A vault status write must not undo a successfully polished draft. */ }
+}
+
+async function polishDraft(supabase: NonNullable<ReturnType<typeof userClient>>, row: AiDraft): Promise<"updated" | "skipped" | "error"> {
+  if (!row.work_done.trim()) return "skipped";
+  try {
+    const polished = await refineDailyWorkDone(row.work_done);
+    if (polished === row.work_done.trim()) return "skipped";
+    // The original text condition prevents a slower AI response from overwriting an edit made in another tab.
+    const { data, error } = await supabase.from("support_daily_updates").update({ work_done: polished })
+      .eq("id", row.id).eq("state", "draft").eq("work_done", row.work_done).select("id");
+    return !error && data?.length ? "updated" : "skipped";
+  } catch {
+    return "error";
+  }
+}
+
+export async function refineDraftAction(fd: FormData) {
+  const { supabase, user, ownDeveloperId } = await ctx();
+  const id = str(fd, "id"), fallbackDate = dateOf(fd);
+  if (!UUID.test(id)) back(fallbackDate, "aiErrors=1");
+  if (!await geminiRuntimeConfigured()) back(fallbackDate, "notice=nogemini");
+  const { data } = await supabase.from("support_daily_updates")
+    .select("id,developer_id,update_date,work_done,state").eq("id", id).maybeSingle<AiDraft>();
+  const date = data && isDateString(data.update_date) ? data.update_date : fallbackDate;
+  if (!data) back(date, "aiErrors=1");
+  const row = data as AiDraft;
+  if (!canEditAiDraft(row, user, ownDeveloperId)) back(date, "aiErrors=1");
+  const result = await polishDraft(supabase, row);
+  if (result === "error") await recordGeminiCheck("Daily update request failed");
+  else if (result === "updated") await recordGeminiCheck();
+  back(date, result === "updated" ? "aiRefined=1" : result === "skipped" ? "aiSkipped=1" : "aiErrors=1");
+}
+
+export async function refineAllDraftsAction(fd: FormData) {
+  const { supabase, user, ownDeveloperId } = await ctx();
+  const date = dateOf(fd);
+  if (!await geminiRuntimeConfigured()) back(date, "notice=nogemini");
+  const requested = [...new Set(fd.getAll("id").map((value) => String(value)).filter((id) => UUID.test(id)))];
+  if (!requested.length) back(date, "aiSkipped=1");
+  const ids = requested.slice(0, MAX_AI_ROWS);
+  const { data, error } = await supabase.from("support_daily_updates")
+    .select("id,developer_id,update_date,work_done,state").in("id", ids).returns<AiDraft[]>();
+  if (error) back(date, "aiErrors=1");
+  const rows = (data ?? []).filter((row) => row.update_date === date && canEditAiDraft(row, user, ownDeveloperId));
+  const counts = { updated: 0, skipped: requested.length - rows.length, error: 0 };
+  for (let index = 0; index < rows.length; index += 3) {
+    const results = await Promise.all(rows.slice(index, index + 3).map((row) => polishDraft(supabase, row)));
+    for (const result of results) counts[result]++;
+  }
+  if (counts.error) await recordGeminiCheck("One or more daily update requests failed");
+  else if (counts.updated) await recordGeminiCheck();
+  back(date, `aiRefined=${counts.updated}&aiSkipped=${counts.skipped}&aiErrors=${counts.error}`);
 }
 
 async function ticketIdFor(supabase: NonNullable<ReturnType<typeof userClient>>, number: string): Promise<string | null | "missing"> {

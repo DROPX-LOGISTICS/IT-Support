@@ -2,7 +2,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { canManageMaster } from "@/lib/access";
-import { disconnectIntegration, googleOAuthAccessToken, noteIntegrationCheck, runtimeGithubToken, saveOAuthApp, type IntegrationProvider } from "@/lib/integrations";
+import { testGeminiConnection } from "@/lib/gemini";
+import {
+  disconnectGeminiIntegration, disconnectIntegration, googleOAuthAccessToken, noteGeminiCheck, noteIntegrationCheck,
+  runtimeGithubToken, saveGeminiIntegration, saveOAuthApp, type IntegrationProvider,
+} from "@/lib/integrations";
 import { requireUser } from "@/lib/session";
 
 const str = (fd: FormData, key: string) => String(fd.get(key) ?? "").trim();
@@ -50,4 +54,39 @@ export async function testIntegrationAction(fd: FormData) {
     await noteIntegrationCheck(provider, "Connection test failed");
   }
   done(!error, error ? "Connection test failed. Reconnect the account and try again." : `${provider === "google" ? "Google Workspace" : "GitHub"} connection is healthy.`);
+}
+
+export async function saveGeminiAction(fd: FormData) {
+  await admin();
+  const apiKey = str(fd, "apiKey"), model = str(fd, "model");
+  if (apiKey.length < 20 || apiKey.length > 300 || /\s/.test(apiKey)) done(false, "Enter a valid Gemini API key from Google AI Studio.");
+  if (!/^[a-z0-9._-]{3,100}$/i.test(model)) done(false, "Enter a valid Gemini model name.");
+  try { await saveGeminiIntegration(apiKey, model); }
+  catch { done(false, "Secure token storage is not ready. Check the worker KV and encryption key."); }
+  try {
+    await testGeminiConnection(apiKey, model);
+    await noteGeminiCheck();
+  } catch {
+    await noteGeminiCheck("Connection test failed");
+    done(false, "Gemini settings were saved securely, but the connection test failed. Check the key, model and API restrictions.");
+  }
+  done(true, "Gemini AI is ready for daily-update polishing.");
+}
+
+export async function testGeminiAction() {
+  await admin();
+  try {
+    await testGeminiConnection();
+    await noteGeminiCheck();
+  } catch {
+    await noteGeminiCheck("Connection test failed");
+    done(false, "Gemini connection test failed. Replace the API key or check its API restrictions.");
+  }
+  done(true, "Gemini AI connection is healthy.");
+}
+
+export async function disconnectGeminiAction() {
+  await admin();
+  await disconnectGeminiIntegration();
+  done(true, "The dashboard Gemini API key was removed.");
 }

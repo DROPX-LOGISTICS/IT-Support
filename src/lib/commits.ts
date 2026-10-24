@@ -1,4 +1,5 @@
 import { formatTicketNumber, parseTicketNumber } from "./ticket-number.ts";
+import { toPointList } from "./daily-text.ts";
 
 export type Commit = {
   repo: string; gitRef?: string | null; sha: string; message: string; date: string;
@@ -149,7 +150,7 @@ export function buildDrafts(input: {
   }
   const rows: DraftRow[] = [...groups.values()].map((g) => ({
     developerId: g.developerId, portalId: g.portalId, ticketId: g.ticket?.id ?? null,
-    workDone: toSentences(g.subjects), shas: g.shas,
+    workDone: toPointList(g.subjects), shas: g.shas,
     status: g.ticket && (g.ticket.status === "Closed" || g.ticket.status.startsWith("Done")) ? "Done" : "In progress",
   }));
   return { rows, unmatched, skippedMerges, noPortal };
@@ -174,7 +175,7 @@ export function planUpserts(drafts: DraftRow[], existing: ExistingRow[]) {
     if (!fresh.length) continue;
     updates.push({
       id: open.id,
-      workDone: [open.workDone.trim(), d.workDone].filter(Boolean).join(" "),
+      workDone: [open.workDone.trim(), d.workDone].filter(Boolean).join("\n"),
       shas: [...open.shas, ...fresh],
     });
   }

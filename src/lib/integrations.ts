@@ -27,10 +27,28 @@ export type IntegrationSummary = {
   source: "dashboard" | "environment" | "none";
   storageReady: boolean;
 };
+export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
+export type GeminiIntegrationRecord = {
+  apiKey: string;
+  model: string;
+  updatedAt: string;
+  lastCheckedAt?: string;
+  lastError?: string;
+};
+export type GeminiIntegrationSummary = {
+  configured: boolean;
+  model: string;
+  updatedAt: string | null;
+  lastCheckedAt: string | null;
+  lastError: string | null;
+  source: "dashboard" | "environment" | "none";
+  storageReady: boolean;
+};
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 const keyName = (provider: IntegrationProvider) => `oauth:${provider}:v1`;
+const GEMINI_KEY = "api:gemini:v1";
 
 async function bindings(): Promise<{ kv: IntegrationKvNamespace | null; secret: string }> {
   try {
@@ -55,17 +73,17 @@ async function aesKey(secret: string) {
   const digest = await crypto.subtle.digest("SHA-256", enc.encode(secret));
   return crypto.subtle.importKey("raw", digest, "AES-GCM", false, ["encrypt", "decrypt"]);
 }
-async function seal(value: IntegrationRecord, secret: string) {
+async function seal<T>(value: T, secret: string) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await aesKey(secret), enc.encode(JSON.stringify(value)));
   return `${b64(iv)}.${b64(new Uint8Array(data))}`;
 }
-async function open(value: string, secret: string): Promise<IntegrationRecord | null> {
+async function open<T>(value: string, secret: string): Promise<T | null> {
   try {
     const [iv, data] = value.split(".");
     if (!iv || !data) return null;
     const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(iv) }, await aesKey(secret), unb64(data));
-    return JSON.parse(dec.decode(plain)) as IntegrationRecord;
+    return JSON.parse(dec.decode(plain)) as T;
   } catch {
     return null;
   }
@@ -79,7 +97,7 @@ export async function readIntegration(provider: IntegrationProvider): Promise<In
   const { kv, secret } = await bindings();
   if (!kv || !secret) return null;
   const stored = await kv.get(keyName(provider));
-  return stored ? open(stored, secret) : null;
+  return stored ? open<IntegrationRecord>(stored, secret) : null;
 }
 export async function writeIntegration(provider: IntegrationProvider, value: IntegrationRecord) {
   const { kv, secret } = await bindings();
@@ -118,8 +136,66 @@ function envGoogleRecord(): IntegrationRecord | null {
   return { clientId, clientSecret, refreshToken, account: process.env.MAIL_FROM?.trim(), updatedAt: "environment" };
 }
 
-export async function integrationSummaries(): Promise<Record<IntegrationProvider, IntegrationSummary>> {
-  const [storageReady, googleStored, githubStored] = await Promise.all([integrationStorageReady(), readIntegration("google"), readIntegration("github")]);
+function envGeminiRecord(): GeminiIntegrationRecord | null {
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  if (!apiKey) return null;
+  return { apiKey, model: process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL, updatedAt: "environment" };
+}
+
+export async function readGeminiIntegration(): Promise<GeminiIntegrationRecord | null> {
+  const { kv, secret } = await bindings();
+  if (!kv || !secret) return null;
+  const stored = await kv.get(GEMINI_KEY);
+  return stored ? open<GeminiIntegrationRecord>(stored, secret) : null;
+}
+
+export async function saveGeminiIntegration(apiKey: string, model: string) {
+  const { kv, secret } = await bindings();
+  if (!kv || !secret) throw new Error("Secure integration storage is not configured");
+  const existing = await readGeminiIntegration();
+  await kv.put(GEMINI_KEY, await seal({
+    apiKey, model, updatedAt: new Date().toISOString(),
+    lastCheckedAt: existing?.lastCheckedAt, lastError: undefined,
+  } satisfies GeminiIntegrationRecord, secret));
+}
+
+export async function disconnectGeminiIntegration() {
+  const { kv } = await bindings();
+  if (kv) await kv.delete(GEMINI_KEY);
+}
+
+export async function noteGeminiCheck(error?: string) {
+  const existing = await readGeminiIntegration();
+  if (!existing) return;
+  const { kv, secret } = await bindings();
+  if (!kv || !secret) return;
+  await kv.put(GEMINI_KEY, await seal({
+    ...existing, lastCheckedAt: new Date().toISOString(), lastError: error,
+  } satisfies GeminiIntegrationRecord, secret));
+}
+
+export async function geminiRuntimeConfig(): Promise<(GeminiIntegrationRecord & { source: "dashboard" | "environment" }) | null> {
+  const stored = await readGeminiIntegration();
+  if (stored?.apiKey) return { ...stored, model: stored.model || DEFAULT_GEMINI_MODEL, source: "dashboard" };
+  const env = envGeminiRecord();
+  return env ? { ...env, source: "environment" } : null;
+}
+
+export async function geminiIntegrationSummary(): Promise<GeminiIntegrationSummary> {
+  const [storageReady, stored] = await Promise.all([integrationStorageReady(), readGeminiIntegration()]);
+  const env = envGeminiRecord();
+  const active = stored?.apiKey ? stored : env;
+  return {
+    configured: Boolean(active?.apiKey), model: active?.model || process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL,
+    updatedAt: stored?.updatedAt ?? null, lastCheckedAt: stored?.lastCheckedAt ?? null, lastError: stored?.lastError ?? null,
+    source: stored?.apiKey ? "dashboard" : env?.apiKey ? "environment" : "none", storageReady,
+  };
+}
+
+export async function geminiRuntimeConfigured() { return Boolean(await geminiRuntimeConfig()); }
+
+export async function integrationSummaries(): Promise<Record<IntegrationProvider, IntegrationSummary> & { gemini: GeminiIntegrationSummary }> {
+  const [storageReady, googleStored, githubStored, gemini] = await Promise.all([integrationStorageReady(), readIntegration("google"), readIntegration("github"), geminiIntegrationSummary()]);
   const googleEnv = envGoogleRecord();
   const githubEnv = tokenForRepo("any/any") || process.env.GITHUB_TOKEN_NISAR_DROPX?.trim() || process.env.GITHUB_TOKEN_DROPX_LOGISTICS?.trim();
   const summary = (provider: IntegrationProvider, stored: IntegrationRecord | null, envConnected: boolean): IntegrationSummary => ({
@@ -131,7 +207,7 @@ export async function integrationSummaries(): Promise<Record<IntegrationProvider
     lastError: stored?.lastError ?? null, source: stored?.[provider === "google" ? "refreshToken" : "accessToken"] ? "dashboard" : envConnected || (provider === "google" && Boolean(googleEnv || googleCredentialsConfigured(process.env))) ? "environment" : "none",
     storageReady,
   });
-  return { google: summary("google", googleStored, Boolean(googleEnv || googleCredentialsConfigured(process.env))), github: summary("github", githubStored, Boolean(githubEnv)) };
+  return { google: summary("google", googleStored, Boolean(googleEnv || googleCredentialsConfigured(process.env))), github: summary("github", githubStored, Boolean(githubEnv)), gemini };
 }
 
 export async function oauthApp(provider: IntegrationProvider) {

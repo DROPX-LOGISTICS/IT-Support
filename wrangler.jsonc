@@ -20,6 +20,7 @@
     "SUPABASE_URL": "https://uimajyffojydenqsegjv.supabase.co",
     "MAIL_FROM": "tech@dropxlogistics.com",
     "GOOGLE_CALENDAR_ORGANIZER": "tech@dropxlogistics.com",
-    "GOOGLE_SHEETS_OWNER": "tech@dropxlogistics.com"
+    "GOOGLE_SHEETS_OWNER": "tech@dropxlogistics.com",
+    "GEMINI_MODEL": "gemini-3.5-flash"
   }
 }

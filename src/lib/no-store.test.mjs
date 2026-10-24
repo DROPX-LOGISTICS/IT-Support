@@ -8,8 +8,8 @@ for (const file of ["../lib/supabase/admin.ts", "../lib/supabase/server.ts", "..
     assert.match(readFileSync(new URL(file, import.meta.url), "utf8"), /cache: "no-store"/);
   });
 }
-test("the GitHub client and the Google clients never cache either", () => {
-  for (const f of ["github.ts", "google-calendar.ts", "google-sheets.ts", "google-auth.ts"]) {
+test("the GitHub, Google and Gemini clients never cache either", () => {
+  for (const f of ["github.ts", "google-calendar.ts", "google-sheets.ts", "google-auth.ts", "gemini.ts", "integrations.ts"]) {
     assert.match(readFileSync(new URL(`./${f}`, import.meta.url), "utf8"), /no-store/, f);
   }
 });

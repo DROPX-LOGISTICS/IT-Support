@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, CalendarDays, CheckCircle2, ExternalLink, Github, KeyRound, Mail, Plug, ShieldCheck, Table2 } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle2, ExternalLink, Github, KeyRound, Mail, Pencil, Plug, ShieldCheck, Sparkles, Table2 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { NotConfigured } from "@/components/ui";
 import { canManageMaster } from "@/lib/access";
 import { requireUser } from "@/lib/session";
@@ -14,7 +15,9 @@ import { integrationSummaries } from "@/lib/integrations";
 import { oauthCallback } from "@/lib/oauth";
 import { PRIORITIES, PRIORITY_LABEL } from "@/lib/tickets";
 import { updateSettings, addDeveloper, addPortal, addRepo, deleteRepo, dismissUnmatched, mapUnmatched, seedKnownSystems, setUserAccess, updateDeveloper, updatePortal, updateRepo } from "./actions";
-import { disconnectIntegrationAction, saveOAuthAppAction, testIntegrationAction } from "./integration-actions";
+import {
+  disconnectGeminiAction, disconnectIntegrationAction, saveGeminiAction, saveOAuthAppAction, testGeminiAction, testIntegrationAction,
+} from "./integration-actions";
 
 export const dynamic = "force-dynamic";
 const TABS = [["portals", "Portals"], ["repos", "Repositories"], ["developers", "Developers"], ["people", "People & access"], ["unmatched", "Unmatched commits"], ["settings", "Settings"], ["integrations", "Integrations"]] as const;
@@ -91,14 +94,29 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
             <p className="hint" style={{ margin: 0 }}>Paste owner/repo or a GitHub /tree/branch URL. A source with no path prefixes belongs wholly to its portal; use comma-separated prefixes when the same branch serves several portals.</p>
             <div className="master-records">
               {R.map((r) => (
-                <form key={r.id} action={updateRepo} className="card master-card repo-record">
-                  <input type="hidden" name="id" value={r.id} />
-                  <div className="repo-identity"><label className="field">Repository</label><a href={githubRepoUrl(r.repo, r.git_ref)} target="_blank" rel="noreferrer">{r.repo}<ExternalLink size={12} aria-hidden /></a><small>{portalName(r.portal_id)}{r.git_ref ? ` · ${r.git_ref}` : " · default branch"}</small></div>
-                  <Field label="Portal"><select name="portalId" defaultValue={r.portal_id}>{P.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
-                  <Field label="Branch / ref"><input type="text" name="gitRef" defaultValue={r.git_ref ?? ""} placeholder="Default branch" /></Field>
-                  <Field label="Path prefixes"><input type="text" name="prefixes" defaultValue={r.path_prefixes.join(", ")} placeholder="Blank = whole repository" /></Field>
-                  <div className="record-actions"><button className="btn ghost sm danger-text" type="submit" formAction={deleteRepo}>Remove</button><button className="btn sm" type="submit">Save</button></div>
-                </form>
+                <details key={r.id} className="card master-card repo-item">
+                  <summary className="repo-record-summary">
+                    <div className="repo-identity"><span className="field">Repository</span><a href={githubRepoUrl(r.repo, r.git_ref)} target="_blank" rel="noreferrer">{r.repo}<ExternalLink size={12} aria-hidden /></a></div>
+                    <div className="repo-summary-value"><span>Portal</span><strong>{portalName(r.portal_id)}</strong></div>
+                    <div className="repo-summary-value"><span>Branch</span><strong>{r.git_ref || "Default"}</strong></div>
+                    <div className="repo-summary-value"><span>Scope</span><strong>{r.path_prefixes.length ? `${r.path_prefixes.length} path${r.path_prefixes.length === 1 ? "" : "s"}` : "Whole repository"}</strong></div>
+                    <span className="btn ghost sm repo-edit-button"><Pencil size={13} aria-hidden /> Edit</span>
+                  </summary>
+                  <div className="repo-edit-panel">
+                    <form action={updateRepo} className="repo-edit-form">
+                      <input type="hidden" name="id" value={r.id} />
+                      <Field label="Repository"><input type="text" name="repo" defaultValue={r.repo} required /></Field>
+                      <Field label="Portal"><select name="portalId" defaultValue={r.portal_id}>{P.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+                      <Field label="Branch / ref"><input type="text" name="gitRef" defaultValue={r.git_ref ?? ""} placeholder="Default branch" /></Field>
+                      <Field label="Path prefixes"><input type="text" name="prefixes" defaultValue={r.path_prefixes.join(", ")} placeholder="Blank = whole repository" /></Field>
+                      <button className="btn sm" type="submit">Save changes</button>
+                    </form>
+                    <form action={deleteRepo} className="repo-remove-form">
+                      <input type="hidden" name="id" value={r.id} />
+                      <ConfirmSubmitButton className="btn ghost sm danger-text" confirmMessage={`Remove ${r.repo} from ${portalName(r.portal_id)}?`}>Remove repository</ConfirmSubmitButton>
+                    </form>
+                  </div>
+                </details>
               ))}
             </div>
             <details className="card master-create">
@@ -245,13 +263,38 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
                   </section>
                 );
               })}
+              <section className="card integration-card">
+                <div className="integration-head">
+                  <span className="provider-icon gemini"><Sparkles size={19} aria-hidden /></span>
+                  <div><h2>Gemini AI</h2><span className="hint">Concise daily updates · point form</span></div>
+                  <span className={`system-status ${integrations.gemini.configured ? "live" : "off"}`}>{integrations.gemini.configured ? "Ready" : "Setup needed"}</span>
+                </div>
+                {integrations.gemini.configured ? (
+                  <div className="connection-account"><CheckCircle2 size={16} aria-hidden /><div><strong>{integrations.gemini.model}</strong><span>{integrations.gemini.source === "dashboard" ? "API key stored in the secure vault" : "Provided by the worker environment"}</span></div></div>
+                ) : <p className="muted integration-copy">Turn long commit summaries into clear, professional points without changing the recorded work.</p>}
+                <div className="capability-row"><span><Sparkles size={13} /> One-click polish</span><span>Bulk drafts</span><span>Plain text only</span></div>
+                {integrations.gemini.lastError && <div className="mini-alert"><AlertTriangle size={14} /> {integrations.gemini.lastError}</div>}
+                <div className="integration-actions">
+                  {integrations.gemini.configured && <form action={testGeminiAction}><button className="btn ghost sm" type="submit">Test connection</button></form>}
+                  {integrations.gemini.source === "dashboard" && <form action={disconnectGeminiAction}><button className="linklike danger-link" type="submit">Remove key</button></form>}
+                </div>
+                <details className="integration-setup" open={!integrations.gemini.configured}>
+                  <summary><KeyRound size={14} /> {integrations.gemini.configured ? "Replace API key" : "Set up Gemini AI"}</summary>
+                  <form action={saveGeminiAction} className="compact-form gemini-form">
+                    <p className="oauth-help">Create a restricted key in <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer">Google AI Studio <ExternalLink size={11} /></a>. The key is encrypted before storage and is never shown again.</p>
+                    <label><span>Gemini API key</span><input name="apiKey" type="password" autoComplete="new-password" minLength={20} maxLength={300} required placeholder="Stored encrypted" /></label>
+                    <label><span>Model</span><input name="model" type="text" defaultValue={integrations.gemini.model} maxLength={100} pattern="[A-Za-z0-9._-]+" required /></label>
+                    <button className="btn sm" type="submit">Save and test</button>
+                  </form>
+                </details>
+              </section>
             </div>
 
             <section className="infra-grid">
               {([
                 ["Scheduled jobs", Boolean(process.env.CRON_SECRET?.trim()), "Daily drafts, reminders and auto-close."],
                 ["Service role", Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()), "Private attachments and background jobs."],
-                ["Secure token vault", integrations.google.storageReady, "Encrypted OAuth credentials in Cloudflare KV."],
+                ["Secure token vault", integrations.google.storageReady, "Encrypted OAuth and API credentials in Cloudflare KV."],
               ] as const).map(([name, ok, description]) => <div className="card infra-card" key={name}><ShieldCheck size={17} /><div><strong>{name}</strong><span>{description}</span></div><span className={ok ? "s-ok" : "s-off"}>{ok ? "Ready" : "Missing"}</span></div>)}
             </section>
           </div>
