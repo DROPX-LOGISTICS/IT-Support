@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { canManageMaster } from "@/lib/access";
 import { testGeminiConnection } from "@/lib/gemini";
+import { classifyGeminiFailure, geminiFailureMessage } from "@/lib/gemini-errors";
 import {
   disconnectGeminiIntegration, disconnectIntegration, googleOAuthAccessToken, noteGeminiCheck, noteIntegrationCheck,
   runtimeGithubToken, saveGeminiIntegration, saveOAuthApp, type IntegrationProvider,
@@ -61,15 +62,14 @@ export async function saveGeminiAction(fd: FormData) {
   const apiKey = str(fd, "apiKey"), model = str(fd, "model");
   if (apiKey.length < 20 || apiKey.length > 300 || /\s/.test(apiKey)) done(false, "Enter a valid Gemini API key from Google AI Studio.");
   if (!/^[a-z0-9._-]{3,100}$/i.test(model)) done(false, "Enter a valid Gemini model name.");
-  try { await saveGeminiIntegration(apiKey, model); }
-  catch { done(false, "Secure token storage is not ready. Check the worker KV and encryption key."); }
   try {
     await testGeminiConnection(apiKey, model);
-    await noteGeminiCheck();
-  } catch {
-    await noteGeminiCheck("Connection test failed");
-    done(false, "Gemini settings were saved securely, but the connection test failed. Check the key, model and API restrictions.");
+  } catch (error) {
+    const failure = classifyGeminiFailure(error);
+    done(false, `The new Gemini settings were not saved. ${geminiFailureMessage(failure.code)}`);
   }
+  try { await saveGeminiIntegration(apiKey, model); }
+  catch { done(false, "The key works, but secure token storage is not ready. Check the worker KV and encryption key."); }
   done(true, "Gemini AI is ready for daily-update polishing.");
 }
 
@@ -78,9 +78,11 @@ export async function testGeminiAction() {
   try {
     await testGeminiConnection();
     await noteGeminiCheck();
-  } catch {
-    await noteGeminiCheck("Connection test failed");
-    done(false, "Gemini connection test failed. Replace the API key or check its API restrictions.");
+  } catch (error) {
+    const failure = classifyGeminiFailure(error);
+    const message = geminiFailureMessage(failure.code);
+    await noteGeminiCheck(message);
+    done(false, `Gemini connection test failed. ${message}`);
   }
   done(true, "Gemini AI connection is healthy.");
 }

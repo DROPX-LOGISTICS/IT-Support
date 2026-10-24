@@ -231,13 +231,14 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
               {(["google", "github"] as const).map((provider) => {
                 const item = integrations[provider];
                 const google = provider === "google";
+                const needsAttention = item.connected && Boolean(item.lastError);
                 const Icon = google ? Mail : Github;
                 return (
                   <section key={provider} className="card integration-card">
                     <div className="integration-head">
                       <span className={`provider-icon ${provider}`}><Icon size={19} aria-hidden /></span>
                       <div><h2>{google ? "Google Workspace" : "GitHub"}</h2><span className="hint">{google ? "Gmail · Calendar · Meet · Sheets" : "Repositories · commits · daily updates"}</span></div>
-                      <span className={`system-status ${item.connected ? "live" : "off"}`}>{item.connected ? "Connected" : item.appConfigured ? "Ready to connect" : "Setup needed"}</span>
+                      <span className={`system-status ${needsAttention ? "issue" : item.connected ? "live" : "off"}`}>{needsAttention ? "Needs attention" : item.connected ? "Connected" : item.appConfigured ? "Ready to connect" : "Setup needed"}</span>
                     </div>
                     {item.connected ? (
                       <div className="connection-account"><CheckCircle2 size={16} aria-hidden /><div><strong>{item.account ?? "Connected securely"}</strong><span>{item.source === "dashboard" ? "Connected from this dashboard" : "Provided by the worker environment"}</span></div></div>
@@ -267,7 +268,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
                 <div className="integration-head">
                   <span className="provider-icon gemini"><Sparkles size={19} aria-hidden /></span>
                   <div><h2>Gemini AI</h2><span className="hint">Concise daily updates · point form</span></div>
-                  <span className={`system-status ${integrations.gemini.configured ? "live" : "off"}`}>{integrations.gemini.configured ? "Ready" : "Setup needed"}</span>
+                  <span className={`system-status ${integrations.gemini.lastError ? "issue" : integrations.gemini.configured ? "live" : "off"}`}>{integrations.gemini.lastError ? "Needs attention" : integrations.gemini.configured ? "Ready" : "Setup needed"}</span>
                 </div>
                 {integrations.gemini.configured ? (
                   <div className="connection-account"><CheckCircle2 size={16} aria-hidden /><div><strong>{integrations.gemini.model}</strong><span>{integrations.gemini.source === "dashboard" ? "API key stored in the secure vault" : "Provided by the worker environment"}</span></div></div>

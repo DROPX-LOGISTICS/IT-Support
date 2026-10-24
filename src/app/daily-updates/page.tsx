@@ -9,6 +9,7 @@ import { NotConfigured } from "@/components/ui";
 import { isStaff } from "@/lib/access";
 import { isDateString, previousIstDate } from "@/lib/commits";
 import { fmtDate } from "@/lib/format";
+import { geminiFailureMessage, isGeminiFailureCode } from "@/lib/gemini-errors";
 import { githubRuntimeConfigured } from "@/lib/github";
 import { sheetsRuntimeStatus } from "@/lib/google-sheets";
 import { geminiRuntimeConfigured } from "@/lib/integrations";
@@ -61,6 +62,7 @@ export default async function DailyUpdatesPage({ searchParams }: { searchParams:
   const drafts = rows.filter(canEdit);
   const total = n(searchParams.created) + n(searchParams.updated);
   const aiRefined = n(searchParams.aiRefined), aiSkipped = n(searchParams.aiSkipped), aiErrors = n(searchParams.aiErrors);
+  const aiReason = isGeminiFailureCode(searchParams.aiReason) ? searchParams.aiReason : "unknown";
 
   return (
     <AppShell user={user} width="mid">
@@ -76,7 +78,17 @@ export default async function DailyUpdatesPage({ searchParams }: { searchParams:
       {searchParams.created !== undefined && <div className="banner ok" role="status"><CheckCircle2 size={18} aria-hidden /><div>{total ? `Drafted ${n(searchParams.created)} new and updated ${n(searchParams.updated)} existing row(s).` : "No new commits to add for this day."}{n(searchParams.unmatched) > 0 && ` ${n(searchParams.unmatched)} commit(s) match no developer.`}{n(searchParams.noportal) > 0 && ` ${n(searchParams.noportal)} commit(s) have no registered repository.`}{n(searchParams.errors) > 0 && ` ${n(searchParams.errors)} repository read(s) failed.`}</div></div>}
       {searchParams.published !== undefined && <div className="banner ok" role="status"><CheckCircle2 size={18} aria-hidden /><div>Published {n(searchParams.published)} row(s).{n(searchParams.skipped) > 0 && ` ${n(searchParams.skipped)} need work details or a blocker before publishing.`}</div></div>}
       {(searchParams.aiRefined !== undefined || searchParams.aiSkipped !== undefined || searchParams.aiErrors !== undefined) && (
-        <div className={`banner ${aiErrors && !aiRefined ? "bad" : aiErrors ? "warn" : "ok"}`} role="status">{aiErrors ? <AlertTriangle size={18} aria-hidden /> : <CheckCircle2 size={18} aria-hidden />}<div>Gemini polished {aiRefined} draft{aiRefined === 1 ? "" : "s"}.{aiSkipped > 0 && ` ${aiSkipped} unchanged or skipped.`}{aiErrors > 0 && ` ${aiErrors} request(s) failed; the original text was kept.`}</div></div>
+        <div className={`banner ${aiErrors && !aiRefined ? "bad" : aiErrors ? "warn" : "ok"}`} role="status">
+          {aiErrors ? <AlertTriangle size={18} aria-hidden /> : <CheckCircle2 size={18} aria-hidden />}
+          <div>
+            Gemini polished {aiRefined} draft{aiRefined === 1 ? "" : "s"}.{aiSkipped > 0 && ` ${aiSkipped} unchanged or skipped.`}
+            {aiErrors > 0 && (
+              <> {aiErrors} request{aiErrors === 1 ? "" : "s"} failed. {geminiFailureMessage(aiReason)} The original text was kept.
+                {user.role === "admin" && <> <Link href="/master?tab=integrations">Check integration</Link>.</>}
+              </>
+            )}
+          </div>
+        </div>
       )}
       {error && <div className="banner bad" role="alert">We could not load the updates. Please refresh.</div>}
 

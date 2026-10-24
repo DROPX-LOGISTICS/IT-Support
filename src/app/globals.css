@@ -273,6 +273,7 @@ input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--brand); ve
 .system-card-head .system-status { margin-left: auto; }
 .system-status { font-size: 11px; font-weight: 800; border-radius: 999px; padding: 3px 8px; }
 .system-status.live { color: var(--ok); background: var(--ok-soft); }
+.system-status.issue { color: var(--warn); background: var(--warn-soft); }
 .system-status.off { color: var(--muted); background: var(--surface-2); }
 .system-links { display: grid; gap: 6px; margin-top: 11px; padding-top: 9px; border-top: 1px solid var(--line); }
 .system-links a, .system-links > span { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }

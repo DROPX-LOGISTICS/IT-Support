@@ -152,10 +152,9 @@ export async function readGeminiIntegration(): Promise<GeminiIntegrationRecord |
 export async function saveGeminiIntegration(apiKey: string, model: string) {
   const { kv, secret } = await bindings();
   if (!kv || !secret) throw new Error("Secure integration storage is not configured");
-  const existing = await readGeminiIntegration();
+  const now = new Date().toISOString();
   await kv.put(GEMINI_KEY, await seal({
-    apiKey, model, updatedAt: new Date().toISOString(),
-    lastCheckedAt: existing?.lastCheckedAt, lastError: undefined,
+    apiKey, model, updatedAt: now, lastCheckedAt: now, lastError: undefined,
   } satisfies GeminiIntegrationRecord, secret));
 }
 
