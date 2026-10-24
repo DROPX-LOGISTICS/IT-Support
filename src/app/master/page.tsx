@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AlertTriangle, CalendarDays, CheckCircle2, ExternalLink, Github, KeyRound, Mail, Pencil, Plug, ShieldCheck, Sparkles, Table2 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
+import { ConnectionTestButton } from "@/components/connection-test-button";
 import { NotConfigured } from "@/components/ui";
 import { canManageMaster } from "@/lib/access";
 import { requireUser } from "@/lib/session";
@@ -248,7 +249,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
                     <div className="integration-actions">
                       {item.appConfigured && !item.connected && <a className="btn sm" href={`/api/integrations/${provider}/start`}><ExternalLink size={14} /> Connect {google ? "Google" : "GitHub"}</a>}
                       {google && item.connected && <a className="btn ghost sm" href="/api/integrations/google/start"><ExternalLink size={14} /> Reconnect Google</a>}
-                      {item.connected && <form action={testIntegrationAction}><input type="hidden" name="provider" value={provider} /><button className="btn ghost sm" type="submit">Test connection</button></form>}
+                      {item.connected && <form action={testIntegrationAction}><input type="hidden" name="provider" value={provider} /><ConnectionTestButton provider={google ? "Google Workspace" : "GitHub"} detail={google ? "Checking the saved OAuth session, Sheets and Drive permissions, and organiser mailbox access." : "Checking the saved GitHub token and approved repository access."} /></form>}
                       {item.connected && item.source === "dashboard" && <form action={disconnectIntegrationAction}><input type="hidden" name="provider" value={provider} /><button className="linklike danger-link" type="submit">Disconnect</button></form>}
                     </div>
                     <details className="integration-setup" open={!item.appConfigured}>
@@ -277,7 +278,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
                 <div className="capability-row"><span><Sparkles size={13} /> One-click polish</span><span>Bulk drafts</span><span>Plain text only</span></div>
                 {integrations.gemini.lastError && <div className="mini-alert"><AlertTriangle size={14} /> {integrations.gemini.lastError}</div>}
                 <div className="integration-actions">
-                  {integrations.gemini.configured && <form action={testGeminiAction}><button className="btn ghost sm" type="submit">Test connection</button></form>}
+                  {integrations.gemini.configured && <form action={testGeminiAction}><ConnectionTestButton provider="Gemini AI" detail="Running a live model request with the saved API key. The credential is never shown in the browser." /></form>}
                   {integrations.gemini.source === "dashboard" && <form action={disconnectGeminiAction}><button className="linklike danger-link" type="submit">Remove key</button></form>}
                 </div>
                 <details className="integration-setup" open={!integrations.gemini.configured}>
@@ -286,7 +287,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
                     <p className="oauth-help">Create a restricted key in <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer">Google AI Studio <ExternalLink size={11} /></a>. The key is encrypted before storage and is never shown again.</p>
                     <label><span>Gemini API key</span><input name="apiKey" type="password" autoComplete="new-password" minLength={20} maxLength={300} required placeholder="Stored encrypted" /></label>
                     <label><span>Model</span><input name="model" type="text" defaultValue={integrations.gemini.model} maxLength={100} pattern="[A-Za-z0-9._-]+" required /></label>
-                    <button className="btn sm" type="submit">Save and test</button>
+                    <ConnectionTestButton provider="Gemini AI" detail="Validating the API key, selected model, and a live generation before saving the credential." label="Save and test" pendingLabel="Saving and testing…" />
                   </form>
                 </details>
               </section>
