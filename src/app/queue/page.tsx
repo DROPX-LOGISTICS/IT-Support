@@ -108,6 +108,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Record
           <h2>Nothing matches</h2>
           <p className="muted" style={{ margin: "4px 0 16px" }}>{filtered ? "Try a different view or clear the filters." : "There are no open tickets."}</p>
           {filtered && <Link className="btn ghost" href="/queue">Clear filters</Link>}
+          {!filtered && <div className="actions" style={{ justifyContent: "center" }}><Link className="btn ghost" href="/queue?status=all">View all tickets</Link><Link className="btn" href="/new">Raise a ticket</Link></div>}
         </div>
       ) : (
         <TicketRows team now={now} tickets={rows.map((t) => ({

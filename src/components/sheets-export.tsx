@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useFormState, useFormStatus } from "react-dom";
 import { ExternalLink, Loader2, Table2 } from "lucide-react";
 import { exportToSheets, type SheetResult } from "@/app/export/actions";
@@ -12,7 +13,7 @@ function Go() {
 /** Same rows as the CSV, written to a new Google Sheet shared with you. Shows "not set up" until Google access is configured. */
 export function SheetsExport({ kind, params, status }: { kind: "tickets" | "daily"; params: Record<string, string>; status: "ready" | "off" }) {
   const [state, action] = useFormState(exportToSheets, initial);
-  if (status === "off") return <p className="hint" style={{ margin: "10px 2px" }}>Google Sheets export is not set up yet. Use Export CSV, which opens in Sheets.</p>;
+  if (status === "off") return <p className="hint" style={{ margin: "10px 2px" }}>Google Sheets export needs access. Ask an admin to <Link href="/master?tab=integrations">reconnect Google Workspace</Link>, or use Export CSV.</p>;
   return (
     <form action={action} style={{ margin: "12px 0" }}>
       <input type="hidden" name="kind" value={kind} />

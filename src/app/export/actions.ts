@@ -3,8 +3,7 @@ import { isStaff } from "@/lib/access";
 import { isDateString, istDate, previousIstDate } from "@/lib/commits";
 import { dailyCells, DAILY_HEADER, ticketCells, TICKET_HEADER } from "@/lib/export-columns";
 import { exportRange, loadDailyExport, loadTicketExport } from "@/lib/export-data";
-import { calendarErrorMessage } from "@/lib/google-calendar";
-import { createSheetExport, sheetsRuntimeStatus } from "@/lib/google-sheets";
+import { createSheetExport, sheetsErrorMessage, sheetsRuntimeStatus } from "@/lib/google-sheets";
 import { parseQueueFilters } from "@/lib/queue-filters";
 import { requireUser } from "@/lib/session";
 import { userClient } from "@/lib/supabase/server";
@@ -36,6 +35,6 @@ export async function exportToSheets(_p: SheetResult, fd: FormData): Promise<She
     const r = await createSheetExport(status.owner, { title: `IT Support tickets ${today}`, tab: "Tickets", header: TICKET_HEADER, rows: ticketCells(rows), shareWith: s.user.email });
     return { ok: true, message: `Exported ${rows.length} ticket(s).`, url: r.url };
   } catch (e) {
-    return { ok: false, message: calendarErrorMessage(e).replace("Calendar", "Google") };
+    return { ok: false, message: sheetsErrorMessage(e) };
   }
 }

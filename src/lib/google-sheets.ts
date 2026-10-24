@@ -4,6 +4,7 @@ import { GoogleApiError } from "./google-calendar.ts";
 import { integrationSummaries, runtimeGoogleAccessToken } from "./integrations.ts";
 
 export const SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.file"];
+const hasSheetScopes = (scopes: string[]) => SHEETS_SCOPES.every((scope) => scopes.includes(scope));
 
 export function sheetsStatus(env: Env = process.env): { configured: true; owner: string } | { configured: false; missing: string[] } {
   const owner = (env.GOOGLE_SHEETS_OWNER ?? env.GOOGLE_CALENDAR_ORGANIZER)?.trim();
@@ -17,7 +18,21 @@ export async function sheetsRuntimeStatus(): Promise<{ configured: true; owner: 
   if (env.configured) return env;
   const google = (await integrationSummaries()).google;
   const owner = google.account || process.env.GOOGLE_SHEETS_OWNER?.trim() || process.env.GOOGLE_CALENDAR_ORGANIZER?.trim();
-  return google.connected && owner ? { configured: true, owner } : { configured: false, missing: ["Connect Google Workspace in Master → Integrations"] };
+  if (!google.connected || !owner) return { configured: false, missing: ["Connect Google Workspace in Master → Integrations"] };
+  if (google.source === "dashboard" && !hasSheetScopes(google.scopes)) {
+    return { configured: false, missing: ["Reconnect Google Workspace to grant Sheets and Drive access"] };
+  }
+  return { configured: true, owner };
+}
+
+export function sheetsErrorMessage(e: unknown): string {
+  if (e instanceof GoogleApiError) {
+    if (e.status === 401 || e.status === 403) return "Google Sheets or Drive access is missing for the organiser mailbox. Reconnect Google Workspace under Master → Integrations and grant Sheets and Drive access.";
+    if (e.status === 429) return "Google Sheets rate limit reached. Wait briefly and try again.";
+    if (e.status === 400) return "Google did not accept the sheet export. Try exporting CSV instead.";
+  }
+  if (e instanceof Error && /credentials|delegated access|reconnect/i.test(e.message)) return "Google Workspace access is not ready. Reconnect Google Workspace under Master → Integrations.";
+  return "Could not reach Google Sheets. Please try again.";
 }
 
 export type SheetCell = string | number | null | undefined;

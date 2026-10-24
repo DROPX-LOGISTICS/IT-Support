@@ -4,9 +4,11 @@ import { redirect } from "next/navigation";
 import { canManageMaster } from "@/lib/access";
 import { testGeminiConnection } from "@/lib/gemini";
 import { classifyGeminiFailure, geminiFailureMessage } from "@/lib/gemini-errors";
+import { GoogleApiError } from "@/lib/google-calendar";
+import { SHEETS_SCOPES, sheetsErrorMessage, sheetsRuntimeStatus } from "@/lib/google-sheets";
 import {
-  disconnectGeminiIntegration, disconnectIntegration, googleOAuthAccessToken, noteGeminiCheck, noteIntegrationCheck,
-  runtimeGithubToken, saveGeminiIntegration, saveOAuthApp, type IntegrationProvider,
+  disconnectGeminiIntegration, disconnectIntegration, noteGeminiCheck, noteIntegrationCheck,
+  runtimeGithubToken, runtimeGoogleAccessToken, saveGeminiIntegration, saveOAuthApp, type IntegrationProvider,
 } from "@/lib/integrations";
 import { requireUser } from "@/lib/session";
 
@@ -43,18 +45,32 @@ export async function testIntegrationAction(fd: FormData) {
   const provider = providerOf(str(fd, "provider"));
   if (!provider) done(false, "Unknown integration.");
   let error = false;
+  let errorMessage = "Connection test failed. Reconnect the account and try again.";
   try {
-    const token = provider === "google" ? await googleOAuthAccessToken() : await runtimeGithubToken();
-    if (!token) throw new Error("No connected account");
-    const url = provider === "google" ? "https://www.googleapis.com/oauth2/v2/userinfo" : "https://api.github.com/user";
-    const res = await fetch(url, { headers: { authorization: `Bearer ${token}`, accept: "application/json", "user-agent": "dropx-it-support" }, cache: "no-store", signal: AbortSignal.timeout(12_000) });
-    if (!res.ok) throw new Error(`Provider returned ${res.status}`);
+    if (provider === "google") {
+      const status = await sheetsRuntimeStatus();
+      if (!status.configured) throw new Error(status.missing.join(". "));
+      const token = await runtimeGoogleAccessToken(SHEETS_SCOPES, status.owner);
+      const res = await fetch("https://www.googleapis.com/drive/v3/files?pageSize=1&spaces=drive&fields=files(id)", {
+        headers: { authorization: `Bearer ${token}`, accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(12_000),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: { message?: string } };
+        throw new GoogleApiError(body.error?.message ?? `Google returned ${res.status}`, res.status);
+      }
+    } else {
+      const token = await runtimeGithubToken();
+      if (!token) throw new Error("No connected account");
+      const res = await fetch("https://api.github.com/user", { headers: { authorization: `Bearer ${token}`, accept: "application/json", "user-agent": "dropx-it-support" }, cache: "no-store", signal: AbortSignal.timeout(12_000) });
+      if (!res.ok) throw new Error(`Provider returned ${res.status}`);
+    }
     await noteIntegrationCheck(provider);
-  } catch {
+  } catch (e) {
     error = true;
-    await noteIntegrationCheck(provider, "Connection test failed");
+    errorMessage = provider === "google" ? sheetsErrorMessage(e) : "Connection test failed. Reconnect the account and try again.";
+    await noteIntegrationCheck(provider, errorMessage);
   }
-  done(!error, error ? "Connection test failed. Reconnect the account and try again." : `${provider === "google" ? "Google Workspace" : "GitHub"} connection is healthy.`);
+  done(!error, error ? errorMessage : `${provider === "google" ? "Google Workspace" : "GitHub"} connection is healthy.`);
 }
 
 export async function saveGeminiAction(fd: FormData) {

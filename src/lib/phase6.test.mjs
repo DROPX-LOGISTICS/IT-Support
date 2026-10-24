@@ -9,7 +9,7 @@ import { isAuthorizedCron } from "./cron-auth.ts";
 import { buildEmail, MAIL_KINDS, recipientsFor } from "./email-content.ts";
 import { clearGoogleTokenCache, googleAccessToken, signJwtRs256, serviceAccountFromEnv } from "./google-auth.ts";
 import { buildEventBody, calendarStatus, cancelEvent, createMeetEvent, rescheduleEvent, calendarErrorMessage, GoogleApiError } from "./google-calendar.ts";
-import { createSheetExport, sheetsStatus } from "./google-sheets.ts";
+import { createSheetExport, sheetsErrorMessage, sheetsStatus } from "./google-sheets.ts";
 import { ticketCells, dailyCells } from "./export-columns.ts";
 
 const DONE = "Done – awaiting confirmation";
@@ -226,6 +226,10 @@ test("calendar errors become short safe messages", () => {
   assert.match(calendarErrorMessage(new GoogleApiError("secret detail", 403)), /access is missing/);
   assert.ok(!calendarErrorMessage(new GoogleApiError("secret detail", 500)).includes("secret"));
   assert.match(calendarErrorMessage(new Error("Google Workspace refused the delegated access")), /not set up/);
+});
+test("sheet errors identify Sheets access without leaking provider details", () => {
+  assert.match(sheetsErrorMessage(new GoogleApiError("secret detail", 403)), /Sheets or Drive access is missing/);
+  assert.ok(!sheetsErrorMessage(new GoogleApiError("secret detail", 500)).includes("secret"));
 });
 
 test("sheet export: creates, writes RAW values, shares with the requester", async () => {
