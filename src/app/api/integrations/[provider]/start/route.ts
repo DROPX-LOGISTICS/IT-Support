@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getSession } from "@/lib/session";
-import { oauthApp, type IntegrationProvider } from "@/lib/integrations";
+import { disconnectIntegration, oauthApp, type IntegrationProvider } from "@/lib/integrations";
 import { GITHUB_SCOPES, GOOGLE_SCOPES, oauthCallback, oauthCookie, pkceChallenge, randomToken } from "@/lib/oauth";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +12,10 @@ export async function GET(request: NextRequest, { params }: { params: { provider
   if (!provider || session.state !== "ok" || session.user.role !== "admin") return NextResponse.redirect(new URL("/login", request.url));
   const app = await oauthApp(provider);
   if (!app) return NextResponse.redirect(new URL("/master?tab=integrations&error=Save+the+OAuth+app+details+first.", request.url));
+  // A reconnect must not silently reuse a refresh token that was minted before
+  // Sheets/Drive scopes were added. Keep the OAuth app, clear only the account,
+  // and require Google to issue a fresh grant.
+  if (provider === "google" && request.nextUrl.searchParams.get("force") === "1") await disconnectIntegration("google");
   const state = randomToken(), verifier = randomToken(48), challenge = await pkceChallenge(verifier);
   const callback = oauthCallback(provider, request.nextUrl.origin);
   const url = provider === "google" ? new URL("https://accounts.google.com/o/oauth2/v2/auth") : new URL("https://github.com/login/oauth/authorize");
@@ -25,7 +29,7 @@ export async function GET(request: NextRequest, { params }: { params: { provider
   if (provider === "google") {
     url.searchParams.set("access_type", "offline");
     url.searchParams.set("prompt", "consent");
-    url.searchParams.set("include_granted_scopes", "true");
+    url.searchParams.set("include_granted_scopes", "false");
     url.searchParams.set("hd", "dropxlogistics.com");
   }
   const response = NextResponse.redirect(url);

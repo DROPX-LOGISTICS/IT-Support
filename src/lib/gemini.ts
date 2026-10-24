@@ -70,8 +70,23 @@ async function generate(apiKey: string, model: string, prompt: string, maxOutput
 export async function testGeminiConnection(apiKey?: string, model?: string): Promise<void> {
   const runtime = apiKey && model ? { apiKey, model } : await geminiRuntimeConfig();
   if (!runtime) throw new GeminiRequestError("not_configured", "Gemini is not configured");
-  const response = await generate(runtime.apiKey, runtime.model, "Reply with exactly: OK", 2_048);
-  geminiTextFromResponse(response);
+  // Connection tests must be fast and deterministic. A generation request can
+  // legitimately take a while on a busy model, which made the admin screen
+  // appear frozen even though the key was valid. Model GET validates both the
+  // API key and the selected model without consuming generation quota.
+  let response: Response;
+  try {
+    response = await fetch(modelUrl(runtime.model), {
+      headers: { "x-goog-api-key": runtime.apiKey, accept: "application/json" },
+      cache: "no-store", signal: AbortSignal.timeout(10_000),
+    });
+  } catch (error) {
+    if (error && typeof error === "object" && ((error as { name?: string }).name === "AbortError" || (error as { name?: string }).name === "TimeoutError")) {
+      throw new GeminiRequestError("timeout", "Gemini model validation timed out");
+    }
+    throw error;
+  }
+  if (!response.ok) throw await responseError(response);
 }
 
 export async function refineDailyWorkDone(workDone: string): Promise<string> {

@@ -248,7 +248,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
                     {item.lastError && <div className="mini-alert"><AlertTriangle size={14} /> {item.lastError}</div>}
                     <div className="integration-actions">
                       {item.appConfigured && !item.connected && <a className="btn sm" href={`/api/integrations/${provider}/start`}><ExternalLink size={14} /> Connect {google ? "Google" : "GitHub"}</a>}
-                      {google && item.connected && <a className="btn ghost sm" href="/api/integrations/google/start"><ExternalLink size={14} /> Reconnect Google</a>}
+                      {google && item.connected && <a className="btn ghost sm" href="/api/integrations/google/start?force=1"><ExternalLink size={14} /> Reconnect Google</a>}
                       {item.connected && <form action={testIntegrationAction}><input type="hidden" name="provider" value={provider} /><ConnectionTestButton provider={google ? "Google Workspace" : "GitHub"} detail={google ? "Checking the saved OAuth session, Sheets and Drive permissions, and organiser mailbox access." : "Checking the saved GitHub token and approved repository access."} /></form>}
                       {item.connected && item.source === "dashboard" && <form action={disconnectIntegrationAction}><input type="hidden" name="provider" value={provider} /><button className="linklike danger-link" type="submit">Disconnect</button></form>}
                     </div>

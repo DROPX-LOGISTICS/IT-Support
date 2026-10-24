@@ -4,7 +4,6 @@ import { GoogleApiError } from "./google-calendar.ts";
 import { integrationSummaries, runtimeGoogleAccessToken } from "./integrations.ts";
 
 export const SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.file"];
-const hasSheetScopes = (scopes: string[]) => SHEETS_SCOPES.every((scope) => scopes.includes(scope));
 
 export function sheetsStatus(env: Env = process.env): { configured: true; owner: string } | { configured: false; missing: string[] } {
   const owner = (env.GOOGLE_SHEETS_OWNER ?? env.GOOGLE_CALENDAR_ORGANIZER)?.trim();
@@ -19,9 +18,6 @@ export async function sheetsRuntimeStatus(): Promise<{ configured: true; owner: 
   const google = (await integrationSummaries()).google;
   const owner = google.account || process.env.GOOGLE_SHEETS_OWNER?.trim() || process.env.GOOGLE_CALENDAR_ORGANIZER?.trim();
   if (!google.connected || !owner) return { configured: false, missing: ["Connect Google Workspace in Master → Integrations"] };
-  if (google.source === "dashboard" && !hasSheetScopes(google.scopes)) {
-    return { configured: false, missing: ["Reconnect Google Workspace to grant Sheets and Drive access"] };
-  }
   return { configured: true, owner };
 }
 

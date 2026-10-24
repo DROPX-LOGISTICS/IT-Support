@@ -30,6 +30,7 @@ export async function GET(request: NextRequest, { params }: { params: { provider
     if (!tokenRes.ok || !token.access_token) throw new Error("token exchange failed");
     let account = "Connected account";
     if (provider === "google") {
+      if (!token.refresh_token) throw new Error("Google did not issue a refresh token. Disconnect the account, then reconnect and approve offline access.");
       const profile = await fetch("https://www.googleapis.com/oauth2/v2/userinfo", { headers: { authorization: `Bearer ${token.access_token}` }, cache: "no-store" });
       const user = await profile.json() as { email?: string; verified_email?: boolean };
       if (!profile.ok || !user.email || user.verified_email === false || !user.email.toLowerCase().endsWith(`@${allowedDomain()}`)) throw new Error("Use a verified DropX Workspace account");
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest, { params }: { params: { provider
     });
     return back(request, true, `${provider === "google" ? "Google Workspace" : "GitHub"} connected as ${account}.`);
   } catch (error) {
-    const message = error instanceof Error && /DropX Workspace/.test(error.message) ? error.message : "The provider could not be connected. Check the OAuth app and callback URL.";
+    const message = error instanceof Error && /DropX Workspace|refresh token|offline access/i.test(error.message) ? error.message : "The provider could not be connected. Check the OAuth app and callback URL.";
     await noteIntegrationCheck(provider, message);
     return back(request, false, message);
   }
