@@ -229,6 +229,8 @@ test("calendar errors become short safe messages", () => {
 });
 test("sheet errors identify Sheets access without leaking provider details", () => {
   assert.match(sheetsErrorMessage(new GoogleApiError("secret detail", 403)), /Sheets or Drive access is missing/);
+  assert.match(sheetsErrorMessage(new GoogleApiError("insufficient authentication scopes", 403)), /missing Sheets or Drive permission/);
+  assert.match(sheetsErrorMessage(new GoogleApiError("SERVICE_DISABLED: Drive API has not been used in project", 403)), /Enable both Google Sheets API and Google Drive API/);
   assert.ok(!sheetsErrorMessage(new GoogleApiError("secret detail", 500)).includes("secret"));
 });
 

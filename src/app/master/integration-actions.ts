@@ -51,6 +51,14 @@ export async function testIntegrationAction(fd: FormData) {
       const status = await sheetsRuntimeStatus();
       if (!status.configured) throw new Error(status.missing.join(". "));
       const token = await runtimeGoogleAccessToken(SHEETS_SCOPES, status.owner);
+      const tokenInfo = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(token)}`, {
+        cache: "no-store", signal: AbortSignal.timeout(8_000),
+      });
+      if (!tokenInfo.ok) throw new GoogleApiError(`Google token validation returned ${tokenInfo.status}`, tokenInfo.status);
+      const tokenData = await tokenInfo.json().catch(() => ({})) as { scope?: string; email?: string };
+      const granted = new Set(String(tokenData.scope ?? "").split(/[ ,]+/).filter(Boolean));
+      const missingScopes = SHEETS_SCOPES.filter((scope) => !granted.has(scope));
+      if (missingScopes.length) throw new GoogleApiError("OAuth token has insufficient authentication scopes", 403);
       const res = await fetch("https://www.googleapis.com/drive/v3/files?pageSize=1&spaces=drive&fields=files(id)", {
         headers: { authorization: `Bearer ${token}`, accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(12_000),
       });

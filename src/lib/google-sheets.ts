@@ -23,6 +23,10 @@ export async function sheetsRuntimeStatus(): Promise<{ configured: true; owner: 
 
 export function sheetsErrorMessage(e: unknown): string {
   if (e instanceof GoogleApiError) {
+    const detail = e.message.toLowerCase();
+    if (/insufficient authentication scope|insufficient permission|missing.*(spreadsheet|drive).*scope/.test(detail)) return "The Google OAuth grant is missing Sheets or Drive permission. Use Reconnect Google, approve every requested permission, then test again.";
+    if (/service_disabled|has not been used in project|api.*disabled|accessnotconfigured/.test(detail)) return "Enable both Google Sheets API and Google Drive API in the Google Cloud project used by this OAuth app, then reconnect Google.";
+    if (/admin.*policy|domain.*policy|org.?policy|not allowed by administrator/.test(detail)) return "Your Google Workspace administrator is blocking Sheets or Drive access for this app. Ask the admin to allow the OAuth app, then reconnect Google.";
     if (e.status === 401 || e.status === 403) return "Google Sheets or Drive access is missing for the organiser mailbox. Reconnect Google Workspace under Master → Integrations and grant Sheets and Drive access.";
     if (e.status === 429) return "Google Sheets rate limit reached. Wait briefly and try again.";
     if (e.status === 400) return "Google did not accept the sheet export. Try exporting CSV instead.";
