@@ -264,6 +264,23 @@ input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--brand); ve
 .ic.bug { background: var(--bad-soft); color: var(--bad); } .ic.feat { background: var(--warn-soft); color: var(--warn); } .ic.sup { background: var(--info-soft); color: var(--info); }
 .two-col { display: grid; gap: 18px; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: start; }
 @media (max-width: 1000px) { .two-col { grid-template-columns: 1fr; } }
+.system-grid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.system-card { padding: 16px; }
+.system-card-head { display: flex; align-items: center; gap: 10px; }
+.system-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; color: var(--brand); background: var(--brand-soft); }
+.system-card h2 { margin: 0; }
+.system-card-head .system-status { margin-left: auto; }
+.system-status { font-size: 11px; font-weight: 800; border-radius: 999px; padding: 3px 8px; }
+.system-status.live { color: var(--ok); background: var(--ok-soft); }
+.system-status.off { color: var(--muted); background: var(--surface-2); }
+.system-links { display: grid; gap: 7px; margin-top: 15px; padding-top: 12px; border-top: 1px solid var(--line); }
+.system-links a, .system-links > span { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.system-links a svg:last-child { margin-left: auto; color: var(--faint); }
+.system-scope { display: grid; gap: 3px; margin-top: 12px; padding: 9px 10px; border-radius: 9px; background: var(--surface-2); color: var(--muted); font-size: 11.5px; overflow-wrap: anywhere; }
+.system-scope strong { color: var(--ink); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
+.directory-note { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; color: var(--brand); }
+.directory-note p { margin: 2px 0 0; }
+@media (max-width: 680px) { .system-grid { grid-template-columns: 1fr; } }
 
 /* ---------- KPIs and charts ---------- */
 .kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }

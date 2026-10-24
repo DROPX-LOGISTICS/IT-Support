@@ -2,7 +2,7 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, ClipboardList, Columns3, Home, Inbox, Menu, PlusCircle, Settings2, Ticket, type LucideIcon } from "lucide-react";
+import { BarChart3, ClipboardList, Columns3, Globe2, Home, Inbox, Menu, PlusCircle, Settings2, Ticket, type LucideIcon } from "lucide-react";
 
 export type NavCounts = { confirm: number; unassigned: number };
 type Item = { href: string; label: string; short?: string; icon: LucideIcon; count?: number; countLabel?: string };
@@ -24,6 +24,7 @@ function groups(role: string, counts: NavCounts): Group[] {
       { href: "/queue", label: "Queue", icon: Inbox, count: counts.unassigned, countLabel: "open and unassigned" },
       { href: "/board", label: "Board", icon: Columns3 },
       { href: "/daily-updates", label: "Daily updates", short: "Updates", icon: ClipboardList },
+      { href: "/integrations", label: "Systems directory", short: "Systems", icon: Globe2 },
     ],
   });
   if (role === "admin" || role === "manager") out.push({ label: "Insights", items: [{ href: "/summary", label: "Summary", icon: BarChart3 }] });

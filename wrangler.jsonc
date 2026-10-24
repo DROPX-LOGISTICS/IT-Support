@@ -14,6 +14,9 @@
     "APP_URL": "https://dropx-it-support.withered-voice-1c40.workers.dev",
     "ALLOWED_EMAIL_DOMAIN": "dropxlogistics.com",
     "ADMIN_EMAILS": "tech@dropxlogistics.com",
-    "SUPABASE_URL": "https://uimajyffojydenqsegjv.supabase.co"
+    "SUPABASE_URL": "https://uimajyffojydenqsegjv.supabase.co",
+    "MAIL_FROM": "tech@dropxlogistics.com",
+    "GOOGLE_CALENDAR_ORGANIZER": "tech@dropxlogistics.com",
+    "GOOGLE_SHEETS_OWNER": "tech@dropxlogistics.com"
   }
 }
