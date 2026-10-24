@@ -340,6 +340,7 @@ Confirm each line before seeding; site URLs marked "to fill" are not known yet.
 |---|---|---|---|
 | People | `nisar-dropx/dropx-hrms` | whole repo | `https://people.dropxlogistics.com` |
 | OpsPulse | `nisar-dropx/dropx-partner-dashboard` | `src/app/ops-pulse`, `src/lib/ops-pulse`, `src/app/api/ops-pulse` | to fill |
+| Fleet | `nisar-dropx/dropx-partner-dashboard` branch `feat/fleet-control-20260926` | whole branch | `https://fleet.dropxlogistics.com` |
 | Dashboard | `nisar-dropx/dropx-partner-dashboard` | everything else under `src` | to fill |
 | Connect | `nisar-dropx/dropx-partner-dashboard` | `apps/connect` | to fill |
 | DropX One | `nisar-dropx/dropx-partner-dashboard` | `apps/dropx-tracker-android`, DropX One routes (to confirm) | to fill |

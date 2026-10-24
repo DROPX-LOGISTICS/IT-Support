@@ -25,27 +25,34 @@ export async function draftFromCommits(opts: { db: SupabaseClient; date: string;
   const { since, until } = istDayRange(date);
 
   const [repoRes, devRes, portalRes] = await Promise.all([
-    db.from("support_portal_repos").select("repo,portal_id,path_prefixes"),
+    db.from("support_portal_repos").select("repo,git_ref,portal_id,path_prefixes"),
     db.from("support_developers").select("id,github_logins,commit_author_names,commit_author_emails").eq("is_active", true),
     db.from("support_portals").select("id,sort_order"),
   ]);
-  const repoRows: RepoRow[] = (repoRes.data ?? []).map((r: { repo: string; portal_id: string; path_prefixes: string[] }) => ({ repo: r.repo, portalId: r.portal_id, prefixes: r.path_prefixes ?? [] }));
+  const repoRows: RepoRow[] = (repoRes.data ?? []).map((r: { repo: string; git_ref: string | null; portal_id: string; path_prefixes: string[] }) => ({ repo: r.repo, gitRef: r.git_ref, portalId: r.portal_id, prefixes: r.path_prefixes ?? [] }));
   const developers: Dev[] = (devRes.data ?? []).map((d: { id: string; github_logins: string[]; commit_author_names: string[]; commit_author_emails: string[] }) => ({
     id: d.id, logins: d.github_logins ?? [], names: d.commit_author_names ?? [], emails: d.commit_author_emails ?? [],
   }));
   const portals: PortalInfo[] = (portalRes.data ?? []).map((p: { id: string; sort_order: number }) => ({ id: p.id, sortOrder: p.sort_order }));
 
-  const repos = [...new Set(repoRows.map((r) => r.repo))];
+  const sourceKey = (repo: string, gitRef?: string | null) => `${repo.toLowerCase()}\u0000${gitRef ?? ""}`;
+  const sources = [...new Map(repoRows.map((row) => [sourceKey(row.repo, row.gitRef), { repo: row.repo, gitRef: row.gitRef ?? null }])).values()]
+    .sort((a, b) => Number(Boolean(b.gitRef)) - Number(Boolean(a.gitRef)) || a.repo.localeCompare(b.repo));
   const all: Commit[] = [];
+  const seenCommits = new Set<string>();
   const errors: { repo: string; error: string }[] = [];
   let truncated = false;
-  for (const repo of repos) {
-    const res = await listCommits(repo, since, until);
-    if (res.error) errors.push({ repo, error: res.error });
+  for (const source of sources) {
+    const res = await listCommits(source.repo, since, until, source.gitRef);
+    const label = source.gitRef ? `${source.repo}/tree/${source.gitRef}` : source.repo;
+    if (res.error) errors.push({ repo: label, error: res.error });
     if (res.truncated) truncated = true;
     let detail = 0;
     for (const c of res.commits) {
-      if (c.parents <= 1 && needsFiles(repoRows, repo) && detail++ < MAX_DETAIL_CALLS) c.files = await commitFiles(repo, c.sha);
+      const commitKey = `${c.repo.toLowerCase()}\u0000${c.sha.toLowerCase()}`;
+      if (seenCommits.has(commitKey)) continue;
+      seenCommits.add(commitKey);
+      if (c.parents <= 1 && needsFiles(repoRows, source.repo, source.gitRef) && detail++ < MAX_DETAIL_CALLS) c.files = await commitFiles(source.repo, c.sha);
       all.push(c);
     }
   }
@@ -101,14 +108,14 @@ export async function draftFromCommits(opts: { db: SupabaseClient; date: string;
     }
     // Commits that match a developer now (after an admin mapped them) are no longer unmatched.
     const matched = all.filter((c) => !built.unmatched.includes(c));
-    for (const repo of repos) {
+    for (const repo of [...new Set(sources.map((source) => source.repo))]) {
       const shas = matched.filter((c) => c.repo === repo).map((c) => c.sha);
       if (shas.length) await db.from("support_unmatched_commits").delete().eq("repo", repo).in("sha", shas);
     }
   }
 
   return {
-    configured: true, date, repos: repos.length, commits: all.length, created, updated, unmatched: built.unmatched.length,
+    configured: true, date, repos: sources.length, commits: all.length, created, updated, unmatched: built.unmatched.length,
     noPortal: built.noPortal.length, skippedMerges: built.skippedMerges, truncated, errors,
   };
 }

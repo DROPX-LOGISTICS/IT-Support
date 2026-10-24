@@ -19,22 +19,26 @@ export async function syncKnownSystems(supabase: SupabaseClient) {
   if (readError) throw readError;
   const ids = new Map((rows ?? []).map((p) => [p.code, p.id]));
   const repos = [
-    ["people", "nisar-dropx/dropx-hrms", []],
-    ["opspulse", "nisar-dropx/dropx-partner-dashboard", ["src/app/ops-pulse", "src/lib/ops-pulse", "src/app/api/ops-pulse"]],
-    ["dashboard", "nisar-dropx/dropx-partner-dashboard", []],
-    ["connect", "nisar-dropx/dropx-partner-dashboard", ["apps/connect"]],
-    ["dropx-one", "nisar-dropx/dropx-partner-dashboard", ["apps/dropx-tracker-android"]],
-    ["opspulse", "DROPX-LOGISTICS/Amazon-EDD-Worker", []],
-    ["opspulse", "DROPX-LOGISTICS/ops-worker", []],
-    ["delivery-tracker", "DROPX-LOGISTICS/dropx-delivery-tracker", []],
+    { code: "people", repo: "nisar-dropx/dropx-hrms", gitRef: null, prefixes: [] },
+    { code: "opspulse", repo: "nisar-dropx/dropx-partner-dashboard", gitRef: null, prefixes: ["src/app/ops-pulse", "src/lib/ops-pulse", "src/app/api/ops-pulse"] },
+    { code: "fleet", repo: "nisar-dropx/dropx-partner-dashboard", gitRef: "feat/fleet-control-20260926", prefixes: [] },
+    { code: "dashboard", repo: "nisar-dropx/dropx-partner-dashboard", gitRef: null, prefixes: [] },
+    { code: "connect", repo: "nisar-dropx/dropx-partner-dashboard", gitRef: null, prefixes: ["apps/connect"] },
+    { code: "dropx-one", repo: "nisar-dropx/dropx-partner-dashboard", gitRef: null, prefixes: ["apps/dropx-tracker-android"] },
+    { code: "opspulse", repo: "DROPX-LOGISTICS/Amazon-EDD-Worker", gitRef: null, prefixes: [] },
+    { code: "opspulse", repo: "DROPX-LOGISTICS/ops-worker", gitRef: null, prefixes: [] },
+    { code: "delivery-tracker", repo: "DROPX-LOGISTICS/dropx-delivery-tracker", gitRef: null, prefixes: [] },
   ] as const;
-  for (const [code, repo, prefixes] of repos) {
-    const portalId = ids.get(code);
+  for (const mapping of repos) {
+    const portalId = ids.get(mapping.code);
     if (!portalId) continue;
-    const { data: existing } = await supabase.from("support_portal_repos").select("id").eq("portal_id", portalId).eq("repo", repo).maybeSingle();
+    let existingQuery = supabase.from("support_portal_repos").select("id").eq("portal_id", portalId).eq("repo", mapping.repo);
+    existingQuery = mapping.gitRef ? existingQuery.eq("git_ref", mapping.gitRef) : existingQuery.is("git_ref", null);
+    const { data: existing, error: existingError } = await existingQuery.maybeSingle();
+    if (existingError) throw existingError;
     const result = existing?.id
-      ? await supabase.from("support_portal_repos").update({ path_prefixes: prefixes }).eq("id", existing.id)
-      : await supabase.from("support_portal_repos").insert({ portal_id: portalId, repo, path_prefixes: prefixes });
+      ? await supabase.from("support_portal_repos").update({ git_ref: mapping.gitRef, path_prefixes: mapping.prefixes }).eq("id", existing.id)
+      : await supabase.from("support_portal_repos").insert({ portal_id: portalId, repo: mapping.repo, git_ref: mapping.gitRef, path_prefixes: mapping.prefixes });
     if (result.error) throw result.error;
   }
   const developers = [

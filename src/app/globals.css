@@ -276,6 +276,8 @@ input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--brand); ve
 .system-status.off { color: var(--muted); background: var(--surface-2); }
 .system-links { display: grid; gap: 6px; margin-top: 11px; padding-top: 9px; border-top: 1px solid var(--line); }
 .system-links a, .system-links > span { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.system-links a > span { min-width: 0; }
+.system-links a small { display: block; color: var(--muted); font-size: 10.5px; font-weight: 500; }
 .system-links a svg:last-child { margin-left: auto; color: var(--faint); }
 .system-scope { display: grid; gap: 3px; margin-top: 12px; padding: 9px 10px; border-radius: 9px; background: var(--surface-2); color: var(--muted); font-size: 11.5px; overflow-wrap: anywhere; }
 .system-scope strong { color: var(--ink); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
@@ -308,7 +310,8 @@ input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--brand); ve
 .master-create[open] > summary::after, .identity-editor[open] > summary::after { transform: rotate(-135deg); }
 .master-create > summary small { color: var(--muted); font-weight: 500; }
 .master-create > form { padding: 11px 13px 13px; border-top: 1px solid var(--line); background: var(--surface-2); }
-.repo-record { display: grid; grid-template-columns: minmax(210px, 1.1fr) minmax(150px, .65fr) minmax(220px, 1fr) auto; gap: 9px; align-items: end; }
+.repo-record { display: grid; grid-template-columns: minmax(190px, 1fr) minmax(130px, .6fr) minmax(150px, .75fr) minmax(190px, 1fr) auto; gap: 9px; align-items: end; }
+.repo-add-record { grid-template-columns: minmax(280px, 1.25fr) minmax(150px, .65fr) minmax(220px, 1fr) auto; }
 .repo-identity { min-width: 0; }
 .repo-identity a { display: flex; align-items: center; gap: 5px; min-width: 0; color: var(--ink); font-weight: 700; overflow-wrap: anywhere; }
 .repo-identity a svg { flex: none; color: var(--faint); }

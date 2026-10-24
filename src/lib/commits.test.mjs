@@ -62,6 +62,16 @@ test("a tie goes to the lower sort order", () => {
 test("a repo not in the registry has no portal", () => {
   assert.equal(portalForCommit({ repo: "other/repo", files: null }, shared, portals), null);
 });
+test("a branch mapping is isolated from the default branch of the same repository", () => {
+  const branchRows = [
+    { repo: "o/r", gitRef: null, portalId: "dash", prefixes: [] },
+    { repo: "o/r", gitRef: "feat/fleet", portalId: "fleet", prefixes: [] },
+  ];
+  const branchPortals = [...portals, { id: "fleet", sortOrder: 30 }];
+  assert.equal(portalForCommit({ repo: "o/r", gitRef: null, files: null }, branchRows, branchPortals), "dash");
+  assert.equal(portalForCommit({ repo: "o/r", gitRef: "feat/fleet", files: null }, branchRows, branchPortals), "fleet");
+  assert.equal(needsFiles(branchRows, "o/r", "feat/fleet"), false);
+});
 
 const base = (commits, extra = {}) => ({
   commits, developers: [dev("d1", { logins: ["nisar-dropx"] })], repoRows: [{ repo: "o/r", portalId: "dash", prefixes: [] }],

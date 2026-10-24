@@ -1,12 +1,12 @@
 import { formatTicketNumber, parseTicketNumber } from "./ticket-number.ts";
 
 export type Commit = {
-  repo: string; sha: string; message: string; date: string;
+  repo: string; gitRef?: string | null; sha: string; message: string; date: string;
   authorLogin: string | null; authorName: string; authorEmail: string;
   parents: number; files: string[] | null;
 };
 export type Dev = { id: string; logins: string[]; names: string[]; emails: string[] };
-export type RepoRow = { repo: string; portalId: string; prefixes: string[] };
+export type RepoRow = { repo: string; gitRef?: string | null; portalId: string; prefixes: string[] };
 export type PortalInfo = { id: string; sortOrder: number };
 export type TicketInfo = { id: string; status: string };
 
@@ -62,9 +62,11 @@ export function normalizePrefix(p: string): string {
 
 const underPrefix = (file: string, prefix: string) => file === prefix || file.startsWith(`${prefix}/`);
 
-/** A repo needs per-file detail only when several portals share it and at least one has path prefixes. */
-export function needsFiles(rows: RepoRow[], repo: string): boolean {
-  const mine = rows.filter((r) => lower(r.repo) === lower(repo));
+const sameSource = (row: RepoRow, repo: string, gitRef?: string | null) => lower(row.repo) === lower(repo) && (row.gitRef ?? "") === (gitRef ?? "");
+
+/** A repository source (including its branch) needs file detail only when several portals share it and one has path prefixes. */
+export function needsFiles(rows: RepoRow[], repo: string, gitRef?: string | null): boolean {
+  const mine = rows.filter((r) => sameSource(r, repo, gitRef));
   return new Set(mine.map((r) => r.portalId)).size > 1 && mine.some((r) => r.prefixes.length > 0);
 }
 
@@ -72,8 +74,8 @@ export function needsFiles(rows: RepoRow[], repo: string): boolean {
  * The portal whose path prefix matches most changed files. Files that match no prefix go to the repo's
  * whole-repo portal (a row with no prefixes). Ties go to the lower sort order.
  */
-export function portalForCommit(c: Pick<Commit, "repo" | "files">, rows: RepoRow[], portals: PortalInfo[]): string | null {
-  const mine = rows.filter((r) => lower(r.repo) === lower(c.repo));
+export function portalForCommit(c: Pick<Commit, "repo" | "gitRef" | "files">, rows: RepoRow[], portals: PortalInfo[]): string | null {
+  const mine = rows.filter((r) => sameSource(r, c.repo, c.gitRef));
   if (!mine.length) return null;
   const order = (id: string) => portals.find((p) => p.id === id)?.sortOrder ?? 1_000_000;
   const byOrder = (a: string, b: string) => order(a) - order(b) || a.localeCompare(b);

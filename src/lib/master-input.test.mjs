@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cleanSiteUrl, isPortalCode, isRepoName, parseList, parsePrefixes, slugify } from "./master-input.ts";
+import { cleanGitRef, cleanSiteUrl, githubRepoUrl, isPortalCode, isRepoName, parseList, parsePrefixes, parseRepoLocator, slugify } from "./master-input.ts";
 
 test("lists split on lines and commas, without duplicates", () => {
   assert.deepEqual(parseList("a, b\nA;c\n\n"), ["a", "b", "c"]);
@@ -16,6 +16,18 @@ test("repo names, portal codes and slugs", () => {
   assert.equal(isPortalCode("dropx-one"), true);
   assert.equal(isPortalCode("Bad Code"), false);
   assert.equal(slugify("DropX One"), "dropx-one");
+});
+test("repository inputs accept GitHub branch paths and URLs", () => {
+  const branch = { repo: "nisar-dropx/dropx-partner-dashboard", gitRef: "feat/fleet-control-20260926" };
+  assert.deepEqual(parseRepoLocator("nisar-dropx/dropx-partner-dashboard/tree/feat/fleet-control-20260926"), { ok: true, value: branch });
+  assert.deepEqual(parseRepoLocator("https://github.com/nisar-dropx/dropx-partner-dashboard/tree/feat/fleet-control-20260926?x=1"), { ok: true, value: branch });
+  assert.deepEqual(parseRepoLocator("https://github.com/nisar-dropx/dropx-hrms.git"), { ok: true, value: { repo: "nisar-dropx/dropx-hrms", gitRef: null } });
+  assert.equal(parseRepoLocator("https://gitlab.com/a/b").ok, false);
+  assert.equal(parseRepoLocator("a/b/issues/1").ok, false);
+  assert.equal(parseRepoLocator("a/b/tree/bad..branch").ok, false);
+  assert.deepEqual(cleanGitRef("refs/heads/feat/fleet"), { ok: true, value: "feat/fleet" });
+  assert.equal(cleanGitRef("bad branch").ok, false);
+  assert.equal(githubRepoUrl(branch.repo, branch.gitRef), "https://github.com/nisar-dropx/dropx-partner-dashboard/tree/feat/fleet-control-20260926");
 });
 test("site address must be http(s) or empty", () => {
   assert.deepEqual(cleanSiteUrl(""), { ok: true, value: null });

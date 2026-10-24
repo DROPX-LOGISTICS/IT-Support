@@ -33,15 +33,17 @@ type ApiCommit = {
 
 const MAX_PAGES = 10;
 
-/** Commits on the default branch inside the window, newest first. Errors are returned, never thrown, and never include the token. */
-export async function listCommits(repo: string, since: string, until: string): Promise<{ commits: Commit[]; truncated: boolean; error?: string }> {
+/** Commits on the selected branch (or default branch) inside the window. Errors never include the token. */
+export async function listCommits(repo: string, since: string, until: string, gitRef?: string | null): Promise<{ commits: Commit[]; truncated: boolean; error?: string }> {
   if (!REPO.test(repo)) return { commits: [], truncated: false, error: "invalid repository name" };
   const token = tokenForRepo(repo) ?? await runtimeGithubToken(repo);
   if (!token) return { commits: [], truncated: false, error: "no GitHub token for this repository owner" };
   const commits: Commit[] = [];
   try {
     for (let page = 1; page <= MAX_PAGES; page++) {
-      const res = await gh(`/repos/${repo}/commits?since=${encodeURIComponent(since)}&until=${encodeURIComponent(until)}&per_page=100&page=${page}`, token);
+      const query = new URLSearchParams({ since, until, per_page: "100", page: String(page) });
+      if (gitRef) query.set("sha", gitRef);
+      const res = await gh(`/repos/${repo}/commits?${query}`, token);
       if (res.status === 404) return { commits, truncated: false, error: "not found or no access" };
       if (res.status === 401) return { commits, truncated: false, error: "token rejected" };
       if (res.status === 403 || res.status === 429) return { commits, truncated: false, error: "rate limited or forbidden" };
@@ -49,7 +51,7 @@ export async function listCommits(repo: string, since: string, until: string): P
       const items = (await res.json()) as ApiCommit[];
       for (const it of items) {
         commits.push({
-          repo, sha: it.sha, message: it.commit.message, date: it.commit.author?.date ?? since,
+          repo, gitRef: gitRef ?? null, sha: it.sha, message: it.commit.message, date: it.commit.author?.date ?? since,
           authorLogin: it.author?.login ?? null, authorName: it.commit.author?.name ?? "", authorEmail: it.commit.author?.email ?? "",
           parents: it.parents?.length ?? 1, files: null,
         });

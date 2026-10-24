@@ -7,6 +7,7 @@ import { canManageMaster } from "@/lib/access";
 import { requireUser } from "@/lib/session";
 import { userClient } from "@/lib/supabase/server";
 import { fmtDate } from "@/lib/format";
+import { githubRepoUrl } from "@/lib/master-input";
 import { loadSettings } from "@/lib/targets-server";
 import { appUrl } from "@/lib/config";
 import { integrationSummaries } from "@/lib/integrations";
@@ -19,7 +20,7 @@ export const dynamic = "force-dynamic";
 const TABS = [["portals", "Portals"], ["repos", "Repositories"], ["developers", "Developers"], ["people", "People & access"], ["unmatched", "Unmatched commits"], ["settings", "Settings"], ["integrations", "Integrations"]] as const;
 
 type Portal = { id: string; code: string; name: string; site_url: string | null; is_active: boolean; sort_order: number };
-type Repo = { id: string; repo: string; portal_id: string; path_prefixes: string[] };
+type Repo = { id: string; repo: string; git_ref: string | null; portal_id: string; path_prefixes: string[] };
 type Dev = { id: string; user_id: string | null; display_name: string; github_logins: string[]; commit_author_names: string[]; commit_author_emails: string[]; is_active: boolean };
 type Person = { id: string; email: string; name: string; role: string; is_active: boolean };
 type Unmatched = { id: string; repo: string; sha: string; commit_date: string; author_login: string | null; author_name: string | null; author_email: string | null; subject: string };
@@ -34,7 +35,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
 
   const [portals, repos, devs, people, unmatched] = await Promise.all([
     supabase.from("support_portals").select("*").order("sort_order").returns<Portal[]>(),
-    supabase.from("support_portal_repos").select("id,repo,portal_id,path_prefixes").order("repo").returns<Repo[]>(),
+    supabase.from("support_portal_repos").select("id,repo,git_ref,portal_id,path_prefixes").order("repo").returns<Repo[]>(),
     supabase.from("support_developers").select("*").order("display_name").returns<Dev[]>(),
     supabase.from("support_users").select("id,email,name,role,is_active").order("name").returns<Person[]>(),
     supabase.from("support_unmatched_commits").select("*").order("commit_date", { ascending: false }).limit(100).returns<Unmatched[]>(),
@@ -87,13 +88,14 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
 
         {tab === "repos" && (
           <div className="stack">
-            <p className="hint" style={{ margin: 0 }}>A repository with no path prefixes belongs wholly to its portal. When one repository serves several portals, separate its path prefixes with commas; the row with no prefixes catches everything else.</p>
+            <p className="hint" style={{ margin: 0 }}>Paste owner/repo or a GitHub /tree/branch URL. A source with no path prefixes belongs wholly to its portal; use comma-separated prefixes when the same branch serves several portals.</p>
             <div className="master-records">
               {R.map((r) => (
                 <form key={r.id} action={updateRepo} className="card master-card repo-record">
                   <input type="hidden" name="id" value={r.id} />
-                  <div className="repo-identity"><label className="field">Repository</label><a href={`https://github.com/${r.repo}`} target="_blank" rel="noreferrer">{r.repo}<ExternalLink size={12} aria-hidden /></a><small>{portalName(r.portal_id)}</small></div>
+                  <div className="repo-identity"><label className="field">Repository</label><a href={githubRepoUrl(r.repo, r.git_ref)} target="_blank" rel="noreferrer">{r.repo}<ExternalLink size={12} aria-hidden /></a><small>{portalName(r.portal_id)}{r.git_ref ? ` · ${r.git_ref}` : " · default branch"}</small></div>
                   <Field label="Portal"><select name="portalId" defaultValue={r.portal_id}>{P.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+                  <Field label="Branch / ref"><input type="text" name="gitRef" defaultValue={r.git_ref ?? ""} placeholder="Default branch" /></Field>
                   <Field label="Path prefixes"><input type="text" name="prefixes" defaultValue={r.path_prefixes.join(", ")} placeholder="Blank = whole repository" /></Field>
                   <div className="record-actions"><button className="btn ghost sm danger-text" type="submit" formAction={deleteRepo}>Remove</button><button className="btn sm" type="submit">Save</button></div>
                 </form>
@@ -102,7 +104,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
             <details className="card master-create">
               <summary><span>Add a repository</span><small>Use owner/name from GitHub</small></summary>
               <form action={addRepo} className="repo-record repo-add-record">
-                <Field label="Repository (owner/name)"><input type="text" name="repo" placeholder="nisar-dropx/dropx-hrms" required /></Field>
+                <Field label="Repository or branch URL"><input type="text" name="repo" placeholder="owner/repo/tree/feat/branch" required /></Field>
                 <Field label="Portal"><select name="portalId" required defaultValue=""><option value="" disabled>Choose…</option>{P.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
                 <Field label="Path prefixes"><input type="text" name="prefixes" placeholder="Optional; separate with commas" /></Field>
                 <button className="btn sm" type="submit">Add repository</button>

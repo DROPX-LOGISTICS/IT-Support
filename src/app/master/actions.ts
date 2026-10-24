@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { canManageMaster } from "@/lib/access";
-import { cleanSiteUrl, isPortalCode, isRepoName, parseList, parsePrefixes, slugify } from "@/lib/master-input";
+import { cleanGitRef, cleanSiteUrl, isPortalCode, parseList, parsePrefixes, parseRepoLocator, slugify } from "@/lib/master-input";
 import { validateSettingsInput } from "@/lib/targets";
 import { requireUser } from "@/lib/session";
 import { userClient } from "@/lib/supabase/server";
@@ -58,9 +58,16 @@ export async function updatePortal(fd: FormData) {
 export async function addRepo(fd: FormData) {
   const { supabase } = await admin();
   const portalId = str(fd, "portalId");
-  const repo = str(fd, "repo");
-  if (!UUID.test(portalId) || !isRepoName(repo)) done("repos", "Enter the repository as owner/name and choose a portal.", false);
-  const { error } = await supabase.from("support_portal_repos").insert({ portal_id: portalId, repo, path_prefixes: parsePrefixes(str(fd, "prefixes")) });
+  const source = parseRepoLocator(str(fd, "repo"));
+  if (!UUID.test(portalId) || !source.ok) done("repos", "Enter owner/name or a GitHub /tree/branch URL, then choose a portal.", false);
+  const { repo, gitRef } = source.ok ? source.value : { repo: "", gitRef: null };
+  const repoPattern = repo.replace(/[\\%_]/g, "\\$&");
+  let duplicate = supabase.from("support_portal_repos").select("id", { head: true, count: "exact" }).eq("portal_id", portalId).ilike("repo", repoPattern);
+  duplicate = gitRef ? duplicate.eq("git_ref", gitRef) : duplicate.is("git_ref", null);
+  const { count, error: duplicateError } = await duplicate;
+  if (duplicateError) done("repos", "Could not check the repository mapping.", false);
+  if (count) done("repos", "That repository branch is already linked to this portal.", false);
+  const { error } = await supabase.from("support_portal_repos").insert({ portal_id: portalId, repo, git_ref: gitRef, path_prefixes: parsePrefixes(str(fd, "prefixes")) });
   done("repos", error ? "Could not add the repository." : "Repository added.", !error);
 }
 
@@ -68,8 +75,10 @@ export async function updateRepo(fd: FormData) {
   const { supabase } = await admin();
   const id = str(fd, "id");
   const portalId = str(fd, "portalId");
+  const gitRef = cleanGitRef(str(fd, "gitRef"));
   if (!UUID.test(id) || !UUID.test(portalId)) done("repos", "Choose a portal.", false);
-  const { error } = await supabase.from("support_portal_repos").update({ portal_id: portalId, path_prefixes: parsePrefixes(str(fd, "prefixes")) }).eq("id", id);
+  if (!gitRef.ok) done("repos", "Enter a valid Git branch, tag or commit ref.", false);
+  const { error } = await supabase.from("support_portal_repos").update({ portal_id: portalId, git_ref: gitRef.ok ? gitRef.value : null, path_prefixes: parsePrefixes(str(fd, "prefixes")) }).eq("id", id);
   done("repos", error ? "Could not save the repository." : "Repository saved.", !error);
 }
 

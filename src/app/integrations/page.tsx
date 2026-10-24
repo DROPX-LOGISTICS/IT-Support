@@ -1,13 +1,14 @@
 import { ExternalLink, Github, Globe2, GitBranch, ShieldCheck } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { NotConfigured } from "@/components/ui";
+import { githubRepoUrl } from "@/lib/master-input";
 import { requireUser } from "@/lib/session";
 import { userClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
 type Portal = { id: string; code: string; name: string; site_url: string | null; is_active: boolean };
-type Repo = { id: string; portal_id: string; repo: string; path_prefixes: string[] };
+type Repo = { id: string; portal_id: string; repo: string; git_ref: string | null; path_prefixes: string[] };
 
 export default async function IntegrationsPage() {
   const session = await requireUser();
@@ -15,7 +16,7 @@ export default async function IntegrationsPage() {
   const db = userClient()!;
   const [{ data: portals }, { data: repos }] = await Promise.all([
     db.from("support_portals").select("id,code,name,site_url,is_active").order("sort_order").returns<Portal[]>(),
-    db.from("support_portal_repos").select("id,portal_id,repo,path_prefixes").order("repo").returns<Repo[]>(),
+    db.from("support_portal_repos").select("id,portal_id,repo,git_ref,path_prefixes").order("repo").returns<Repo[]>(),
   ]);
   const items = portals ?? [];
   const allRepos = repos ?? [];
@@ -42,7 +43,7 @@ export default async function IntegrationsPage() {
               </div>
               <div className="system-links">
                 {portal.site_url ? <a href={portal.site_url} target="_blank" rel="noreferrer"><ExternalLink size={15} aria-hidden /> Open live site</a> : <span className="muted"><Globe2 size={15} aria-hidden /> Live URL not added</span>}
-                {portalRepos.length > 0 ? portalRepos.map((repo) => <a key={repo.id} href={`https://github.com/${repo.repo}`} target="_blank" rel="noreferrer"><Github size={15} aria-hidden /> {repo.repo}<GitBranch size={13} aria-hidden /></a>) : <span className="muted"><Github size={15} aria-hidden /> Repository not linked</span>}
+                {portalRepos.length > 0 ? portalRepos.map((repo) => <a key={repo.id} href={githubRepoUrl(repo.repo, repo.git_ref)} target="_blank" rel="noreferrer"><Github size={15} aria-hidden /> <span>{repo.repo}{repo.git_ref && <small>Branch: {repo.git_ref}</small>}</span><GitBranch size={13} aria-hidden /></a>) : <span className="muted"><Github size={15} aria-hidden /> Repository not linked</span>}
               </div>
               {portalRepos.some((repo) => repo.path_prefixes.length > 0) && <div className="system-scope"><strong>Tracked paths</strong><span>{portalRepos.flatMap((repo) => repo.path_prefixes).join(" · ")}</span></div>}
             </section>
