@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { canChangeTicket } from "@/lib/access";
 import { appUrl } from "@/lib/config";
 import { isMailKind } from "@/lib/email-content";
-import { calendarErrorMessage, calendarStatus, cancelEvent, createMeetEvent, rescheduleEvent } from "@/lib/google-calendar";
+import { calendarErrorMessage, calendarRuntimeStatus, cancelEvent, createMeetEvent, rescheduleEvent } from "@/lib/google-calendar";
 import { isDateString } from "@/lib/commits";
 import { istLocalToIso, parseMeetLink } from "@/lib/meet";
 import { cancelMeetForTicket } from "@/lib/meet-server";
@@ -197,7 +197,7 @@ export async function createMeetSession(_p: ActionResult, fd: FormData): Promise
   const id = str(fd.get("ticketId"));
   if (!UUID.test(id)) return { ok: false, message: "Ticket not found." };
   if (!isDev(ctx)) return { ok: false, message: "You are not allowed to change tickets." };
-  const cal = calendarStatus();
+  const cal = await calendarRuntimeStatus();
   if (!cal.configured) return { ok: false, message: "Automatic scheduling is not set up yet. Use the Calendar link below." };
   const input = meetInput(fd);
   if (!input.ok) return { ok: false, message: input.error };
@@ -232,7 +232,7 @@ export async function rescheduleMeetSession(_p: ActionResult, fd: FormData): Pro
   const id = str(fd.get("ticketId"));
   if (!UUID.test(id)) return { ok: false, message: "Ticket not found." };
   if (!isDev(ctx)) return { ok: false, message: "You are not allowed to change tickets." };
-  const cal = calendarStatus();
+  const cal = await calendarRuntimeStatus();
   if (!cal.configured) return { ok: false, message: "Automatic scheduling is not set up yet." };
   const input = meetInput(fd);
   if (!input.ok) return { ok: false, message: input.error };

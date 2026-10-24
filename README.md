@@ -59,6 +59,16 @@ what is missing. Use a **development** Supabase project, never production.
 On Vercel add them under Project Settings, Environment Variables. Nothing secret is
 ever written to code, migrations or logs.
 
+## Connect integrations from the dashboard
+
+Admins can configure Google Workspace and GitHub under **Master → Integrations**. The worker stores OAuth app credentials and provider tokens encrypted in a dedicated Cloudflare KV namespace; the encryption key remains a Worker secret.
+
+1. In Google Cloud, create a Web OAuth client and add the callback URL shown on the Google Workspace card. Enable Gmail, Calendar, Sheets and Drive APIs. Save its client ID and secret in the card, then click **Connect Google** and sign in as `tech@dropxlogistics.com`.
+2. In GitHub, create an OAuth App and add the callback URL shown on the GitHub card. Save its client ID and secret, click **Connect GitHub**, and authorize access to the required private repositories. Organization SSO may also need approval.
+3. Use **Test connection** after connecting. Disconnect removes provider tokens while retaining the OAuth app configuration.
+
+The dashboard flow replaces `GMAIL_REFRESH_TOKEN` and `GITHUB_TOKEN` for normal operation. Environment credentials remain supported as a fallback. A Google Workspace service account remains supported for unattended Calendar and Sheets access.
+
 ## Database
 
 Migrations live in `supabase/migrations/<UTC timestamp>_<n>.sql` and are safe to re-run.

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircle2, AlertTriangle } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle2, ExternalLink, Github, KeyRound, Mail, Plug, ShieldCheck, Table2 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { NotConfigured } from "@/components/ui";
 import { canManageMaster } from "@/lib/access";
@@ -8,12 +8,12 @@ import { requireUser } from "@/lib/session";
 import { userClient } from "@/lib/supabase/server";
 import { fmtDate } from "@/lib/format";
 import { loadSettings } from "@/lib/targets-server";
-import { githubConfigured } from "@/lib/github";
-import { mailStatus } from "@/lib/mail";
-import { calendarStatus } from "@/lib/google-calendar";
-import { sheetsStatus } from "@/lib/google-sheets";
+import { appUrl } from "@/lib/config";
+import { integrationSummaries } from "@/lib/integrations";
+import { oauthCallback } from "@/lib/oauth";
 import { PRIORITIES, PRIORITY_LABEL } from "@/lib/tickets";
 import { updateSettings, addDeveloper, addPortal, addRepo, deleteRepo, dismissUnmatched, mapUnmatched, seedKnownSystems, setUserAccess, updateDeveloper, updatePortal, updateRepo } from "./actions";
+import { disconnectIntegrationAction, saveOAuthAppAction, testIntegrationAction } from "./integration-actions";
 
 export const dynamic = "force-dynamic";
 const TABS = [["portals", "Portals"], ["repos", "Repositories"], ["developers", "Developers"], ["people", "People & access"], ["unmatched", "Unmatched commits"], ["settings", "Settings"], ["integrations", "Integrations"]] as const;
@@ -41,6 +41,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
   ]);
   const P = portals.data ?? [], R = repos.data ?? [], D = devs.data ?? [], U = people.data ?? [], X = unmatched.data ?? [];
   const cfg = await loadSettings(supabase);
+  const integrations = tab === "integrations" ? await integrationSummaries() : null;
   const staffUsers = U.filter((u) => u.role !== "reporter");
   const portalName = (id: string) => P.find((p) => p.id === id)?.name ?? "";
   const Field = ({ label, children }: { label: string; children: React.ReactNode }) => <div><label className="field">{label}</label>{children}</div>;
@@ -50,7 +51,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
         <p className="eyebrow">Admin</p>
         <h1>Master</h1>
         <p className="muted" style={{ margin: "0 0 14px" }}>Portals, repositories, developers and who can do what. Admins only.</p>
-        <div className="tabs" style={{ flexWrap: "wrap", margin: "0 0 16px" }}>
+        <div className="tabs master-tabs">
           {TABS.map(([k, label]) => <Link key={k} href={`/master?tab=${k}`} aria-current={tab === k}>{label}{k === "unmatched" && X.length ? ` (${X.length})` : ""}</Link>)}
         </div>
         {searchParams.saved && <div className="banner ok" role="status"><CheckCircle2 size={18} aria-hidden /> <div>{searchParams.saved.slice(0, 200)}</div></div>}
@@ -58,9 +59,9 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
 
         {tab === "portals" && (
           <div className="stack">
-            <div className="card seed-card"><div><strong>Start with the known DropX systems</strong><p className="hint">Adds the approved repositories, path mappings, People, the public Connect deployment, and the three developer GitHub logins. It is safe to run again.</p></div><form action={seedKnownSystems}><button className="btn" type="submit">Seed known systems</button></form></div>
+            <div className="card seed-card"><div><strong>Sync the DropX systems directory</strong><p className="hint">Adds or refreshes all approved product links, repositories, path mappings, and developer GitHub identities. Safe to run again.</p></div><form action={seedKnownSystems}><button className="btn sm" type="submit">Sync known systems</button></form></div>
             {P.map((p) => (
-              <form key={p.id} action={updatePortal} className="card grid2">
+              <form key={p.id} action={updatePortal} className="card grid2 master-card">
                 <input type="hidden" name="id" value={p.id} />
                 <Field label={`Name (${p.code})`}><input type="text" name="name" defaultValue={p.name} maxLength={60} required /></Field>
                 <Field label="Site address"><input type="text" name="siteUrl" defaultValue={p.site_url ?? ""} placeholder="https://" /></Field>
@@ -71,7 +72,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
                 </div>
               </form>
             ))}
-            <form action={addPortal} className="card grid2">
+            <form action={addPortal} className="card grid2 master-card">
               <div className="section-title" style={{ gridColumn: "1 / -1", marginBottom: 0 }}>Add a portal</div>
               <Field label="Name"><input type="text" name="name" maxLength={60} required /></Field>
               <Field label="Code (optional)"><input type="text" name="code" placeholder="made from the name" /></Field>
@@ -86,7 +87,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
           <div className="stack">
             <p className="hint" style={{ margin: 0 }}>A repository with no path prefixes belongs wholly to its portal. When one repository serves several portals, give the specific ones prefixes (one per line); the row with no prefixes catches everything else.</p>
             {R.map((r) => (
-              <div key={r.id} className="card">
+              <div key={r.id} className="card master-card">
                 <form action={updateRepo} className="grid2">
                   <input type="hidden" name="id" value={r.id} />
                   <div style={{ gridColumn: "1 / -1", fontWeight: 700, overflowWrap: "anywhere" }}>{r.repo}</div>
@@ -97,7 +98,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
                 <form action={deleteRepo} className="actions" style={{ marginTop: 8 }}><input type="hidden" name="id" value={r.id} /><button className="linklike" type="submit">Remove {r.repo} from {portalName(r.portal_id)}</button></form>
               </div>
             ))}
-            <form action={addRepo} className="card grid2">
+            <form action={addRepo} className="card grid2 master-card">
               <div className="section-title" style={{ gridColumn: "1 / -1", marginBottom: 0 }}>Add a repository</div>
               <Field label="Repository (owner/name)"><input type="text" name="repo" placeholder="nisar-dropx/dropx-hrms" required /></Field>
               <Field label="Portal"><select name="portalId" required defaultValue=""><option value="" disabled>Choose…</option>{P.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
@@ -111,7 +112,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
           <div className="stack">
             <p className="hint" style={{ margin: 0 }}>Commits are matched to a developer by GitHub login, then commit email, then commit name. Give each person the identities they commit with.</p>
             {D.map((d) => (
-              <form key={d.id} action={updateDeveloper} className="card grid2">
+              <form key={d.id} action={updateDeveloper} className="card grid2 master-card">
                 <input type="hidden" name="id" value={d.id} />
                 <Field label="Name"><input type="text" name="displayName" defaultValue={d.display_name} maxLength={80} required /></Field>
                 <Field label="Signs in as"><select name="userId" defaultValue={d.user_id ?? ""}><option value="">Not linked</option>{staffUsers.map((u) => <option key={u.id} value={u.id}>{u.name || u.email} ({u.email})</option>)}</select></Field>
@@ -123,7 +124,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
                 </div>
               </form>
             ))}
-            <form action={addDeveloper} className="card grid2">
+            <form action={addDeveloper} className="card grid2 master-card">
               <div className="section-title" style={{ gridColumn: "1 / -1", marginBottom: 0 }}>Add a developer</div>
               <Field label="Name"><input type="text" name="displayName" maxLength={80} required /></Field>
               <Field label="Signs in as"><select name="userId" defaultValue=""><option value="">Not linked yet</option>{staffUsers.map((u) => <option key={u.id} value={u.id}>{u.name || u.email} ({u.email})</option>)}</select></Field>
@@ -139,7 +140,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
           <div className="stack">
             <p className="hint" style={{ margin: 0 }}>People appear here after their first sign-in. New people start as reporters. Only developers appear in the assignee list.</p>
             {U.map((u) => (
-              <form key={u.id} action={setUserAccess} className="card grid2">
+              <form key={u.id} action={setUserAccess} className="card grid2 master-card">
                 <input type="hidden" name="id" value={u.id} />
                 <div style={{ overflowWrap: "anywhere" }}><strong>{u.name || u.email}</strong><div className="muted">{u.email}</div></div>
                 <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap" }}>
@@ -184,29 +185,61 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
           </form>
         )}
 
-        {tab === "integrations" && (() => {
-          const mail = mailStatus(), cal = calendarStatus(), sh = sheetsStatus();
-          const rows: [string, boolean, string[], string][] = [
-            ["Email (Gmail)", mail.configured, mail.missing, "Raise, assignment, comment, status and reminder emails."],
-            ["GitHub", githubConfigured(), githubConfigured() ? [] : ["GITHUB_TOKEN"], "Daily updates drafted from commits."],
-            ["Scheduled jobs", Boolean(process.env.CRON_SECRET?.trim()), process.env.CRON_SECRET?.trim() ? [] : ["CRON_SECRET"], "Daily drafts, reminders and auto-close."],
-            ["Google Calendar (Meet)", cal.configured, cal.configured ? [] : cal.missing, "Creates, moves and cancels Meet sessions. Without it the Calendar link and manual Meet link are used."],
-            ["Google Sheets export", sh.configured, sh.configured ? [] : sh.missing, "Export straight to a Google Sheet. Without it, CSV download is used."],
-            ["Service role", Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()), process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ? [] : ["SUPABASE_SERVICE_ROLE_KEY"], "Attachments, system emails, jobs."],
-          ];
-          return (
-            <div className="stack">
-              <p className="hint" style={{ margin: 0 }}>Shows only whether each setting exists, never its value.</p>
-              {rows.map(([name, ok, missing, what]) => (
-                <div key={name} className="card">
-                  <div className="status-pill"><strong>{name}</strong><span className={ok ? "s-ok" : "s-off"}>{ok ? "Configured" : "Not configured"}</span></div>
-                  <div className="muted" style={{ fontSize: 14 }}>{what}</div>
-                  {!ok && missing.length > 0 && <div className="hint" style={{ overflowWrap: "anywhere" }}>Missing: {missing.join(", ")}</div>}
-                </div>
-              ))}
+        {tab === "integrations" && integrations && (
+          <div className="stack compact-stack">
+            <section className="integration-hero">
+              <div className="integration-hero-icon"><Plug size={20} aria-hidden /></div>
+              <div><strong>Connect once. Use everywhere.</strong><p>Tokens are encrypted before they are stored in Cloudflare KV. Values are never sent to the browser again.</p></div>
+              <span className={`system-status ${integrations.google.storageReady ? "live" : "off"}`}>{integrations.google.storageReady ? "Secure storage ready" : "Storage unavailable"}</span>
+            </section>
+
+            <div className="integration-grid">
+              {(["google", "github"] as const).map((provider) => {
+                const item = integrations[provider];
+                const google = provider === "google";
+                const Icon = google ? Mail : Github;
+                return (
+                  <section key={provider} className="card integration-card">
+                    <div className="integration-head">
+                      <span className={`provider-icon ${provider}`}><Icon size={19} aria-hidden /></span>
+                      <div><h2>{google ? "Google Workspace" : "GitHub"}</h2><span className="hint">{google ? "Gmail · Calendar · Meet · Sheets" : "Repositories · commits · daily updates"}</span></div>
+                      <span className={`system-status ${item.connected ? "live" : "off"}`}>{item.connected ? "Connected" : item.appConfigured ? "Ready to connect" : "Setup needed"}</span>
+                    </div>
+                    {item.connected ? (
+                      <div className="connection-account"><CheckCircle2 size={16} aria-hidden /><div><strong>{item.account ?? "Connected securely"}</strong><span>{item.source === "dashboard" ? "Connected from this dashboard" : "Provided by the worker environment"}</span></div></div>
+                    ) : <p className="muted integration-copy">{google ? "Send ticket email, create Meet sessions, and export directly to Sheets." : "Read approved repositories and draft developer updates from commits."}</p>}
+                    {google && <div className="capability-row"><span><Mail size={13} /> Gmail</span><span><CalendarDays size={13} /> Meet</span><span><Table2 size={13} /> Sheets</span></div>}
+                    {item.lastError && <div className="mini-alert"><AlertTriangle size={14} /> {item.lastError}</div>}
+                    <div className="integration-actions">
+                      {item.appConfigured && !item.connected && <a className="btn sm" href={`/api/integrations/${provider}/start`}><ExternalLink size={14} /> Connect {google ? "Google" : "GitHub"}</a>}
+                      {item.connected && <form action={testIntegrationAction}><input type="hidden" name="provider" value={provider} /><button className="btn ghost sm" type="submit">Test connection</button></form>}
+                      {item.connected && item.source === "dashboard" && <form action={disconnectIntegrationAction}><input type="hidden" name="provider" value={provider} /><button className="linklike danger-link" type="submit">Disconnect</button></form>}
+                    </div>
+                    <details className="integration-setup" open={!item.appConfigured}>
+                      <summary><KeyRound size={14} /> {item.appConfigured ? "Replace OAuth app" : "Set up OAuth app"}</summary>
+                      <form action={saveOAuthAppAction} className="compact-form">
+                        <input type="hidden" name="provider" value={provider} />
+                        <p className="oauth-help">Create a Web OAuth app in <a href={google ? "https://console.cloud.google.com/apis/credentials" : "https://github.com/settings/applications/new"} target="_blank" rel="noreferrer">{google ? "Google Cloud" : "GitHub settings"} <ExternalLink size={11} /></a>, then register the callback below.</p>
+                        <label><span>Client ID</span><input name="clientId" type="text" autoComplete="off" required placeholder={google ? "Google OAuth client ID" : "GitHub OAuth client ID"} /></label>
+                        <label><span>Client secret</span><input name="clientSecret" type="password" autoComplete="new-password" required placeholder="Stored encrypted" /></label>
+                        <label className="callback-field"><span>Callback URL</span><code>{oauthCallback(provider)}</code></label>
+                        <button className="btn sm" type="submit">Save OAuth app</button>
+                      </form>
+                    </details>
+                  </section>
+                );
+              })}
             </div>
-          );
-        })()}
+
+            <section className="infra-grid">
+              {([
+                ["Scheduled jobs", Boolean(process.env.CRON_SECRET?.trim()), "Daily drafts, reminders and auto-close."],
+                ["Service role", Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()), "Private attachments and background jobs."],
+                ["Secure token vault", integrations.google.storageReady, "Encrypted OAuth credentials in Cloudflare KV."],
+              ] as const).map(([name, ok, description]) => <div className="card infra-card" key={name}><ShieldCheck size={17} /><div><strong>{name}</strong><span>{description}</span></div><span className={ok ? "s-ok" : "s-off"}>{ok ? "Ready" : "Missing"}</span></div>)}
+            </section>
+          </div>
+        )}
 
         {tab === "unmatched" && (
           <div className="stack">

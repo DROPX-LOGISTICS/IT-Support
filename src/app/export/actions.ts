@@ -4,7 +4,7 @@ import { isDateString, istDate, previousIstDate } from "@/lib/commits";
 import { dailyCells, DAILY_HEADER, ticketCells, TICKET_HEADER } from "@/lib/export-columns";
 import { exportRange, loadDailyExport, loadTicketExport } from "@/lib/export-data";
 import { calendarErrorMessage } from "@/lib/google-calendar";
-import { createSheetExport, sheetsStatus } from "@/lib/google-sheets";
+import { createSheetExport, sheetsRuntimeStatus } from "@/lib/google-sheets";
 import { parseQueueFilters } from "@/lib/queue-filters";
 import { requireUser } from "@/lib/session";
 import { userClient } from "@/lib/supabase/server";
@@ -18,7 +18,7 @@ export async function exportToSheets(_p: SheetResult, fd: FormData): Promise<She
   const supabase = userClient();
   if (s.state !== "ok" || !supabase) return { ok: false, message: "Not configured." };
   if (!isStaff(s.user.role)) return { ok: false, message: "You are not allowed to export." };
-  const status = sheetsStatus();
+  const status = await sheetsRuntimeStatus();
   if (!status.configured) return { ok: false, message: "Google Sheets export is not set up yet. Download the CSV instead." };
   const today = istDate(new Date());
   try {

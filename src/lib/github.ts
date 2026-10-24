@@ -1,6 +1,7 @@
 import "server-only";
 import type { Commit } from "./commits.ts";
 import { anyGithubToken, tokenForRepo } from "./github-token.ts";
+import { githubRuntimeConfigured, runtimeGithubToken } from "./integrations.ts";
 
 const API = "https://api.github.com";
 const REPO = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
@@ -8,6 +9,7 @@ const REPO = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 export function githubConfigured(): boolean {
   return anyGithubToken();
 }
+export { githubRuntimeConfigured };
 
 async function gh(path: string, token: string): Promise<Response> {
   return fetch(`${API}${path}`, {
@@ -34,7 +36,7 @@ const MAX_PAGES = 10;
 /** Commits on the default branch inside the window, newest first. Errors are returned, never thrown, and never include the token. */
 export async function listCommits(repo: string, since: string, until: string): Promise<{ commits: Commit[]; truncated: boolean; error?: string }> {
   if (!REPO.test(repo)) return { commits: [], truncated: false, error: "invalid repository name" };
-  const token = tokenForRepo(repo);
+  const token = tokenForRepo(repo) ?? await runtimeGithubToken(repo);
   if (!token) return { commits: [], truncated: false, error: "no GitHub token for this repository owner" };
   const commits: Commit[] = [];
   try {
@@ -62,7 +64,7 @@ export async function listCommits(repo: string, since: string, until: string): P
 
 /** Changed file paths of one commit (needed only to pick a portal when a repo is shared). */
 export async function commitFiles(repo: string, sha: string): Promise<string[] | null> {
-  const token = tokenForRepo(repo);
+  const token = tokenForRepo(repo) ?? await runtimeGithubToken(repo);
   if (!token || !REPO.test(repo) || !/^[0-9a-f]{7,64}$/i.test(sha)) return null;
   try {
     const res = await gh(`/repos/${repo}/commits/${sha}`, token);

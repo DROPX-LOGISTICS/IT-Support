@@ -6,7 +6,7 @@ import { FilterForm } from "@/components/filter-form";
 import { TicketRows } from "@/components/ticket-row";
 import { NotConfigured } from "@/components/ui";
 import { SheetsExport } from "@/components/sheets-export";
-import { sheetsStatus } from "@/lib/google-sheets";
+import { sheetsRuntimeStatus } from "@/lib/google-sheets";
 import { loadSettings } from "@/lib/targets-server";
 import { overdueInfo } from "@/lib/targets";
 import { isStaff } from "@/lib/access";
@@ -40,6 +40,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Record
   if (!isStaff(user.role)) redirect("/my-tickets");
   const f = parseQueueFilters(searchParams);
   const supabase = userClient()!;
+  const sheetsReady = await sheetsRuntimeStatus();
 
   const [{ data: portals }, { data: devs }] = await Promise.all([
     supabase.from("support_portals").select("id,code,name").order("sort_order").returns<{ id: string; code: string; name: string }[]>(),
@@ -98,7 +99,7 @@ export default async function QueuePage({ searchParams }: { searchParams: Record
         </div>
       </FilterForm>
 
-      <SheetsExport kind="tickets" params={Object.fromEntries(Object.entries(f).filter(([, v]) => v))} status={sheetsStatus().configured ? "ready" : "off"} />
+      <SheetsExport kind="tickets" params={Object.fromEntries(Object.entries(f).filter(([, v]) => v))} status={sheetsReady.configured ? "ready" : "off"} />
       {error && <div className="banner bad" role="alert" style={{ marginTop: 16 }}>We could not load the queue. Please refresh.</div>}
       <p className="muted" style={{ margin: "16px 2px 8px" }} role="status">{rows.length === 150 ? "Showing the first 150 tickets" : `${rows.length} ticket${rows.length === 1 ? "" : "s"}`}</p>
       {rows.length === 0 ? (

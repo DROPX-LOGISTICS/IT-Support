@@ -7,6 +7,9 @@
   "compatibility_date": "2025-09-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "kv_namespaces": [
+    { "binding": "INTEGRATIONS", "id": "45d720983aab45e8861608ac63f8d64b" }
+  ],
   "observability": { "enabled": true },
   // Same times as vercel.json (UTC): daily updates 03:30, reminders and auto-close 04:00.
   "triggers": { "crons": ["30 3 * * *", "0 4 * * *"] },

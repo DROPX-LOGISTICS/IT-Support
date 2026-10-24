@@ -6,6 +6,7 @@ import { cleanSiteUrl, isPortalCode, isRepoName, parseList, parsePrefixes, slugi
 import { validateSettingsInput } from "@/lib/targets";
 import { requireUser } from "@/lib/session";
 import { userClient } from "@/lib/supabase/server";
+import { syncKnownSystems } from "@/lib/system-registry";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
@@ -36,44 +37,8 @@ export async function addPortal(fd: FormData) {
 /** Fill the registry with the repositories and public deployment details already approved in the project spec. */
 export async function seedKnownSystems() {
   const { supabase } = await admin();
-  const portals = [
-    { code: "people", name: "People", site_url: "https://people.dropxlogistics.com", sort_order: 10 },
-    { code: "opspulse", name: "OpsPulse", site_url: null, sort_order: 20 },
-    { code: "dropx-one", name: "DropX One", site_url: null, sort_order: 30 },
-    { code: "dashboard", name: "Dashboard", site_url: null, sort_order: 40 },
-    { code: "connect", name: "Connect", site_url: "https://dropx-connect.vercel.app", sort_order: 50 },
-    { code: "delivery-tracker", name: "Delivery Tracker", site_url: null, sort_order: 60 },
-  ];
-  const { error: portalError } = await supabase.from("support_portals").upsert(portals, { onConflict: "code" });
-  if (portalError) done("portals", "Could not seed the known systems.", false);
-  const { data: rows } = await supabase.from("support_portals").select("id,code").in("code", portals.map((p) => p.code));
-  const ids = new Map((rows ?? []).map((p) => [p.code, p.id]));
-  const repos = [
-    ["people", "nisar-dropx/dropx-hrms", []],
-    ["opspulse", "nisar-dropx/dropx-partner-dashboard", ["src/app/ops-pulse", "src/lib/ops-pulse", "src/app/api/ops-pulse"]],
-    ["dashboard", "nisar-dropx/dropx-partner-dashboard", []],
-    ["connect", "nisar-dropx/dropx-partner-dashboard", ["apps/connect"]],
-    ["dropx-one", "nisar-dropx/dropx-partner-dashboard", ["apps/dropx-tracker-android"]],
-    ["opspulse", "DROPX-LOGISTICS/Amazon-EDD-Worker", []],
-    ["opspulse", "DROPX-LOGISTICS/ops-worker", []],
-    ["delivery-tracker", "DROPX-LOGISTICS/dropx-delivery-tracker", []],
-  ] as const;
-  for (const [code, repo, prefixes] of repos) {
-    const portalId = ids.get(code);
-    if (!portalId) continue;
-    const { data: existing } = await supabase.from("support_portal_repos").select("id").eq("portal_id", portalId).eq("repo", repo).maybeSingle();
-    if (existing?.id) await supabase.from("support_portal_repos").update({ path_prefixes: prefixes }).eq("id", existing.id);
-    else await supabase.from("support_portal_repos").insert({ portal_id: portalId, repo, path_prefixes: prefixes });
-  }
-  const developers = [
-    { display_name: "Joseph Mathew", github_logins: ["Josephmathew072"] },
-    { display_name: "Nisar DropX", github_logins: ["nisar-dropx"] },
-    { display_name: "Muhammed Jamsheer", github_logins: ["muhammedjamsheer"] },
-  ];
-  for (const developer of developers) {
-    const { data: existing } = await supabase.from("support_developers").select("id").contains("github_logins", developer.github_logins).maybeSingle();
-    if (!existing) await supabase.from("support_developers").insert(developer);
-  }
+  try { await syncKnownSystems(supabase); }
+  catch { done("portals", "Could not sync the known systems.", false); }
   done("portals", "Known portals, repository mappings and developer identities are ready. Add private deployment URLs and commit emails where needed.");
 }
 

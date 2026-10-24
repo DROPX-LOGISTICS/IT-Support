@@ -1,6 +1,7 @@
 import { googleAccessToken, googleCredentialsConfigured, type AuthDeps, type Env } from "./google-auth.ts";
 import { isValidAddress } from "./mail/message.ts";
 import { GoogleApiError } from "./google-calendar.ts";
+import { integrationSummaries, runtimeGoogleAccessToken } from "./integrations.ts";
 
 export const SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.file"];
 
@@ -11,12 +12,19 @@ export function sheetsStatus(env: Env = process.env): { configured: true; owner:
   if (!owner) missing.push("GOOGLE_SHEETS_OWNER (or GOOGLE_CALENDAR_ORGANIZER)");
   return missing.length || !owner ? { configured: false, missing } : { configured: true, owner };
 }
+export async function sheetsRuntimeStatus(): Promise<{ configured: true; owner: string } | { configured: false; missing: string[] }> {
+  const env = sheetsStatus();
+  if (env.configured) return env;
+  const google = (await integrationSummaries()).google;
+  const owner = google.account || process.env.GOOGLE_SHEETS_OWNER?.trim() || process.env.GOOGLE_CALENDAR_ORGANIZER?.trim();
+  return google.connected && owner ? { configured: true, owner } : { configured: false, missing: ["Connect Google Workspace in Master → Integrations"] };
+}
 
 export type SheetCell = string | number | null | undefined;
 const MAX_CELLS = 400_000;
 
 async function api(deps: AuthDeps, owner: string, method: string, url: string, body?: unknown) {
-  const token = await googleAccessToken(SHEETS_SCOPES, owner, deps);
+  const token = deps.env ? await googleAccessToken(SHEETS_SCOPES, owner, deps) : await runtimeGoogleAccessToken(SHEETS_SCOPES, owner, deps);
   const res = await (deps.fetchFn ?? fetch)(url, {
     method, cache: "no-store", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(30_000),

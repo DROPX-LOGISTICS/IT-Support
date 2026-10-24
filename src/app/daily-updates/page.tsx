@@ -5,11 +5,11 @@ import { AppShell } from "@/components/app-shell";
 import { DailyRowForm } from "@/components/daily-row-form";
 import { NotConfigured } from "@/components/ui";
 import { SheetsExport } from "@/components/sheets-export";
-import { sheetsStatus } from "@/lib/google-sheets";
+import { sheetsRuntimeStatus } from "@/lib/google-sheets";
 import { isStaff } from "@/lib/access";
 import { isDateString, previousIstDate } from "@/lib/commits";
 import { fmtDate } from "@/lib/format";
-import { githubConfigured } from "@/lib/github";
+import { githubRuntimeConfigured } from "@/lib/github";
 import { requireUser } from "@/lib/session";
 import { userClient } from "@/lib/supabase/server";
 import { discardDraft, draftFromCommitsAction, publishAll } from "./actions";
@@ -47,7 +47,7 @@ export default async function DailyUpdatesPage({ searchParams }: { searchParams:
   else if (user.role === "developer") q = q.eq("developer_id", "00000000-0000-0000-0000-000000000000");
   const { data, error } = await q.order("created_at").returns<Row[]>();
   const rows = data ?? [];
-  const configured = githubConfigured();
+  const [configured, sheetsReady] = await Promise.all([githubRuntimeConfigured(), sheetsRuntimeStatus()]);
   const canEdit = (r: Row) => r.state === "draft" && (user.role === "admin" || r.developer_id === own?.id);
   const drafts = rows.filter(canEdit);
   const total = n(searchParams.created) + n(searchParams.updated);
@@ -102,7 +102,7 @@ export default async function DailyUpdatesPage({ searchParams }: { searchParams:
             {viewDev && <input type="hidden" name="dev" value={viewDev} />}
             <div className="actions" style={{ gridColumn: "1 / -1" }}><button className="btn" type="submit">Download CSV</button></div>
           </form>
-          <SheetsExport kind="daily" params={{ from: date, to: date, ...(viewDev ? { dev: viewDev } : {}) }} status={sheetsStatus().configured ? "ready" : "off"} />
+          <SheetsExport kind="daily" params={{ from: date, to: date, ...(viewDev ? { dev: viewDev } : {}) }} status={sheetsReady.configured ? "ready" : "off"} />
         </details>
 
         <p className="muted" style={{ margin: "8px 2px" }}>{fmtDate(date)} · {rows.length} row{rows.length === 1 ? "" : "s"}</p>

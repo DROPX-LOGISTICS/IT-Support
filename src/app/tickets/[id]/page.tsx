@@ -6,7 +6,7 @@ import { CommentForm } from "@/components/comment-form";
 import { ConfirmBar } from "@/components/confirm-bar";
 import { MeetPanel } from "@/components/meet-panel";
 import { RetryEmail } from "@/components/retry-email";
-import { calendarStatus } from "@/lib/google-calendar";
+import { calendarRuntimeStatus } from "@/lib/google-calendar";
 import { isMailKind } from "@/lib/email-content";
 import { loadSettings } from "@/lib/targets-server";
 import { overdueInfo } from "@/lib/targets";
@@ -66,7 +66,7 @@ export default async function TicketPage({ params }: { params: { id: string } })
   const isReporter = t.reporter_id === user.id;
   const awaiting = t.status === DONE;
   const due = staff ? overdueInfo(t, (await loadSettings(supabase)).targets, new Date()) : null;
-  const apiReady = calendarStatus().configured;
+  const apiReady = (await calendarRuntimeStatus()).configured;
   const editable = canChange && t.status !== "Closed" && t.status !== "Not viable";
   const commentList = comments.data ?? [];
   const eventList = events.data ?? [];

@@ -1,5 +1,6 @@
 import "server-only";
 import { buildRawMessage, renderEmail, type EmailContent } from "./message.ts";
+import { googleOAuthAccessToken, readIntegration } from "../integrations.ts";
 
 export type MailResult = { ok: true } | { ok: false; reason: "not_configured" | "failed"; detail?: string };
 
@@ -26,28 +27,16 @@ export function mailStatus(): { configured: boolean; missing: string[] } {
  * result and carry on, so a mail problem can never block a ticket action.
  */
 export async function sendMail(to: string[], subject: string, content: EmailContent): Promise<MailResult> {
-  const cfg = mailConfig();
-  if (!cfg.configured) return { ok: false, reason: "not_configured", detail: cfg.missing.join(", ") };
   try {
+    const stored = await readIntegration("google");
+    const from = process.env.MAIL_FROM?.trim() || stored?.account?.trim();
+    const accessToken = await googleOAuthAccessToken();
+    if (!from || !accessToken) return { ok: false, reason: "not_configured", detail: "Connect Google Workspace in Master → Integrations" };
     const { text, html } = renderEmail(content);
-    const raw = buildRawMessage({ from: cfg.from, to, subject, text, html });
-    const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        client_id: cfg.clientId,
-        client_secret: cfg.clientSecret,
-        refresh_token: cfg.refreshToken,
-        grant_type: "refresh_token",
-      }),
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!tokenRes.ok) return { ok: false, reason: "failed", detail: `token ${tokenRes.status}` };
-    const { access_token } = (await tokenRes.json()) as { access_token?: string };
-    if (!access_token) return { ok: false, reason: "failed", detail: "no access token" };
+    const raw = buildRawMessage({ from, to, subject, text, html });
     const sendRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
       method: "POST",
-      headers: { Authorization: `Bearer ${access_token}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
       body: JSON.stringify({ raw }),
       signal: AbortSignal.timeout(10_000),
     });

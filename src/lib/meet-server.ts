@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { calendarStatus, cancelEvent } from "./google-calendar.ts";
+import { calendarRuntimeStatus, cancelEvent } from "./google-calendar.ts";
 
 /**
  * Cancels the Calendar event of a ticket (guests are told by Google) and clears the Meet fields.
@@ -10,7 +10,7 @@ import { calendarStatus, cancelEvent } from "./google-calendar.ts";
 export async function cancelMeetForTicket(db: SupabaseClient, ticketId: string, actorName: string): Promise<"none" | "cancelled" | "failed"> {
   const { data: t } = await db.from("support_tickets").select("meet_event_id").eq("id", ticketId).maybeSingle();
   if (!t?.meet_event_id) return "none";
-  const cal = calendarStatus();
+  const cal = await calendarRuntimeStatus();
   if (!cal.configured) return "failed";
   try {
     await cancelEvent(cal.organizer, t.meet_event_id);

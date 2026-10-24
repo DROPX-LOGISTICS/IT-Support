@@ -4,7 +4,7 @@ import {
   buildDrafts, extractTicketNumbers, istDayRange, needsFiles, planUpserts,
   type Commit, type Dev, type ExistingRow, type PortalInfo, type RepoRow, type TicketInfo,
 } from "./commits.ts";
-import { commitFiles, githubConfigured, listCommits } from "./github.ts";
+import { commitFiles, githubRuntimeConfigured, listCommits } from "./github.ts";
 
 export type DraftRun =
   | { configured: false }
@@ -20,7 +20,7 @@ const MAX_DETAIL_CALLS = 200;
  * developer's own client for the button (then row-level security limits writes to their rows).
  */
 export async function draftFromCommits(opts: { db: SupabaseClient; date: string; onlyDeveloperId?: string; recordUnmatched: boolean }): Promise<DraftRun> {
-  if (!githubConfigured()) return { configured: false };
+  if (!await githubRuntimeConfigured()) return { configured: false };
   const { db, date } = opts;
   const { since, until } = istDayRange(date);
 

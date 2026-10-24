@@ -1,5 +1,6 @@
 import { parseMeetLink } from "./meet.ts";
 import { googleAccessToken, googleCredentialsConfigured, type AuthDeps, type Env } from "./google-auth.ts";
+import { integrationSummaries, runtimeGoogleAccessToken } from "./integrations.ts";
 
 export const CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar.events";
 const BASE = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
@@ -10,6 +11,13 @@ export function calendarStatus(env: Env = process.env): { configured: true; orga
   if (!googleCredentialsConfigured(env)) missing.push("GOOGLE_WORKSPACE_SERVICE_ACCOUNT_JSON (or the GCP_* federation variables)");
   if (!organizer) missing.push("GOOGLE_CALENDAR_ORGANIZER");
   return missing.length || !organizer ? { configured: false, missing } : { configured: true, organizer };
+}
+export async function calendarRuntimeStatus(): Promise<{ configured: true; organizer: string } | { configured: false; missing: string[] }> {
+  const env = calendarStatus();
+  if (env.configured) return env;
+  const google = (await integrationSummaries()).google;
+  const organizer = google.account || process.env.GOOGLE_CALENDAR_ORGANIZER?.trim();
+  return google.connected && organizer ? { configured: true, organizer } : { configured: false, missing: ["Connect Google Workspace in Master → Integrations"] };
 }
 
 export class GoogleApiError extends Error {
@@ -29,7 +37,7 @@ export function calendarErrorMessage(e: unknown): string {
 
 type CalDeps = AuthDeps & { sleep?: (ms: number) => Promise<void> };
 const call = async (deps: CalDeps, organizer: string, method: string, url: string, body?: unknown) => {
-  const token = await googleAccessToken([CALENDAR_SCOPE], organizer, deps);
+  const token = deps.env ? await googleAccessToken([CALENDAR_SCOPE], organizer, deps) : await runtimeGoogleAccessToken([CALENDAR_SCOPE], organizer, deps);
   const res = await (deps.fetchFn ?? fetch)(url, {
     method, cache: "no-store", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(15_000),
