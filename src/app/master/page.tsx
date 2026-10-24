@@ -13,7 +13,7 @@ import { mailStatus } from "@/lib/mail";
 import { calendarStatus } from "@/lib/google-calendar";
 import { sheetsStatus } from "@/lib/google-sheets";
 import { PRIORITIES, PRIORITY_LABEL } from "@/lib/tickets";
-import { updateSettings, addDeveloper, addPortal, addRepo, deleteRepo, dismissUnmatched, mapUnmatched, setUserAccess, updateDeveloper, updatePortal, updateRepo } from "./actions";
+import { updateSettings, addDeveloper, addPortal, addRepo, deleteRepo, dismissUnmatched, mapUnmatched, seedKnownSystems, setUserAccess, updateDeveloper, updatePortal, updateRepo } from "./actions";
 
 export const dynamic = "force-dynamic";
 const TABS = [["portals", "Portals"], ["repos", "Repositories"], ["developers", "Developers"], ["people", "People & access"], ["unmatched", "Unmatched commits"], ["settings", "Settings"], ["integrations", "Integrations"]] as const;
@@ -58,6 +58,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
 
         {tab === "portals" && (
           <div className="stack">
+            <div className="card seed-card"><div><strong>Start with the known DropX systems</strong><p className="hint">Adds the approved repositories, path mappings, People, the public Connect deployment, and the three developer GitHub logins. It is safe to run again.</p></div><form action={seedKnownSystems}><button className="btn" type="submit">Seed known systems</button></form></div>
             {P.map((p) => (
               <form key={p.id} action={updatePortal} className="card grid2">
                 <input type="hidden" name="id" value={p.id} />

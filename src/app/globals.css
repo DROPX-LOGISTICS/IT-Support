@@ -280,6 +280,9 @@ input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--brand); ve
 .system-scope strong { color: var(--ink); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
 .directory-note { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; color: var(--brand); }
 .directory-note p { margin: 2px 0 0; }
+.seed-card { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-color: var(--brand-line); background: linear-gradient(110deg, var(--brand-soft), var(--surface)); }
+.seed-card p { margin: 3px 0 0; max-width: 70ch; }
+@media (max-width: 680px) { .seed-card { align-items: stretch; flex-direction: column; } .seed-card .btn { width: 100%; } }
 @media (max-width: 680px) { .system-grid { grid-template-columns: 1fr; } }
 
 /* ---------- KPIs and charts ---------- */
