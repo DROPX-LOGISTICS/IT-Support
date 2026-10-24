@@ -43,10 +43,26 @@ export async function syncKnownSystems(supabase: SupabaseClient) {
     { display_name: "Muhammed Jamsheer", github_logins: ["muhammedjamsheer"] },
   ];
   for (const developer of developers) {
-    const { data: existing } = await supabase.from("support_developers").select("id").contains("github_logins", developer.github_logins).maybeSingle();
-    if (!existing) {
+    const login = developer.github_logins[0].toLowerCase();
+    const { data: all, error: developerReadError } = await supabase.from("support_developers").select("id,user_id,github_logins,created_at").order("created_at");
+    if (developerReadError) throw developerReadError;
+    const matches = (all ?? []).filter((row) => (row.github_logins ?? []).some((value: string) => value.toLowerCase() === login));
+    const canonical = matches.find((row) => row.user_id) ?? matches[0];
+    if (!canonical) {
       const { error } = await supabase.from("support_developers").insert(developer);
       if (error) throw error;
+      continue;
+    }
+    // Earlier seed runs could create a second unlinked row when login casing differed. Preserve the linked row and its updates.
+    for (const duplicate of matches.filter((row) => row.id !== canonical.id)) {
+      const { error: moveError } = await supabase.from("support_daily_updates").update({ developer_id: canonical.id }).eq("developer_id", duplicate.id);
+      if (moveError) throw moveError;
+      const { count, error: countError } = await supabase.from("support_daily_updates").select("id", { head: true, count: "exact" }).eq("developer_id", duplicate.id);
+      if (countError) throw countError;
+      if (!count) {
+        const { error: deleteError } = await supabase.from("support_developers").delete().eq("id", duplicate.id);
+        if (deleteError) throw deleteError;
+      }
     }
   }
   return { portals: KNOWN_PORTALS.length, repos: repos.length, developers: developers.length };

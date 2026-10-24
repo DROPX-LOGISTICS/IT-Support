@@ -44,7 +44,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
   const integrations = tab === "integrations" ? await integrationSummaries() : null;
   const staffUsers = U.filter((u) => u.role !== "reporter");
   const portalName = (id: string) => P.find((p) => p.id === id)?.name ?? "";
-  const Field = ({ label, children }: { label: string; children: React.ReactNode }) => <div><label className="field">{label}</label>{children}</div>;
+  const Field = ({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) => <div className={className}><label className="field">{label}</label>{children}</div>;
 
   return (
     <AppShell user={user} width="mid">
@@ -60,79 +60,95 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
         {tab === "portals" && (
           <div className="stack">
             <div className="card seed-card"><div><strong>Sync the DropX systems directory</strong><p className="hint">Adds or refreshes all approved product links, repositories, path mappings, and developer GitHub identities. Safe to run again.</p></div><form action={seedKnownSystems}><button className="btn sm" type="submit">Sync known systems</button></form></div>
-            {P.map((p) => (
-              <form key={p.id} action={updatePortal} className="card grid2 master-card">
-                <input type="hidden" name="id" value={p.id} />
-                <Field label={`Name (${p.code})`}><input type="text" name="name" defaultValue={p.name} maxLength={60} required /></Field>
-                <Field label="Site address"><input type="text" name="siteUrl" defaultValue={p.site_url ?? ""} placeholder="https://" /></Field>
-                <Field label="Order"><input type="text" name="sortOrder" defaultValue={p.sort_order} inputMode="numeric" /></Field>
-                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 10 }}>
-                  <label className="hint"><input type="checkbox" name="active" defaultChecked={p.is_active} /> Active</label>
-                  <button className="btn" type="submit">Save</button>
-                </div>
+            <div className="master-records">
+              {P.map((p) => (
+                <form key={p.id} action={updatePortal} className="card master-card portal-record">
+                  <input type="hidden" name="id" value={p.id} />
+                  <Field className="record-name" label="Portal"><div className="input-with-tag"><input type="text" name="name" defaultValue={p.name} maxLength={60} required /><span>{p.code}</span></div></Field>
+                  <Field className="record-url" label="Site address"><input type="url" name="siteUrl" defaultValue={p.site_url ?? ""} placeholder="https://" /></Field>
+                  <Field className="record-order" label="Order"><input type="text" name="sortOrder" defaultValue={p.sort_order} inputMode="numeric" /></Field>
+                  <label className="compact-check"><input type="checkbox" name="active" defaultChecked={p.is_active} /> Active</label>
+                  <button className="btn sm" type="submit">Save</button>
+                </form>
+              ))}
+            </div>
+            <details className="card master-create">
+              <summary><span>Add a portal</span><small>Create another system entry</small></summary>
+              <form action={addPortal} className="portal-record portal-add-record">
+                <Field className="record-name" label="Name"><input type="text" name="name" maxLength={60} required /></Field>
+                <Field className="record-code" label="Code (optional)"><input type="text" name="code" placeholder="made from the name" /></Field>
+                <Field className="record-url" label="Site address"><input type="url" name="siteUrl" placeholder="https://" /></Field>
+                <Field className="record-order" label="Order"><input type="text" name="sortOrder" defaultValue="100" inputMode="numeric" /></Field>
+                <button className="btn sm" type="submit">Add portal</button>
               </form>
-            ))}
-            <form action={addPortal} className="card grid2 master-card">
-              <div className="section-title" style={{ gridColumn: "1 / -1", marginBottom: 0 }}>Add a portal</div>
-              <Field label="Name"><input type="text" name="name" maxLength={60} required /></Field>
-              <Field label="Code (optional)"><input type="text" name="code" placeholder="made from the name" /></Field>
-              <Field label="Site address"><input type="text" name="siteUrl" placeholder="https://" /></Field>
-              <Field label="Order"><input type="text" name="sortOrder" defaultValue="100" inputMode="numeric" /></Field>
-              <div style={{ gridColumn: "1 / -1" }} className="actions"><button className="btn" type="submit">Add portal</button></div>
-            </form>
+            </details>
           </div>
         )}
 
         {tab === "repos" && (
           <div className="stack">
-            <p className="hint" style={{ margin: 0 }}>A repository with no path prefixes belongs wholly to its portal. When one repository serves several portals, give the specific ones prefixes (one per line); the row with no prefixes catches everything else.</p>
-            {R.map((r) => (
-              <div key={r.id} className="card master-card">
-                <form action={updateRepo} className="grid2">
+            <p className="hint" style={{ margin: 0 }}>A repository with no path prefixes belongs wholly to its portal. When one repository serves several portals, separate its path prefixes with commas; the row with no prefixes catches everything else.</p>
+            <div className="master-records">
+              {R.map((r) => (
+                <form key={r.id} action={updateRepo} className="card master-card repo-record">
                   <input type="hidden" name="id" value={r.id} />
-                  <div style={{ gridColumn: "1 / -1", fontWeight: 700, overflowWrap: "anywhere" }}>{r.repo}</div>
+                  <div className="repo-identity"><label className="field">Repository</label><a href={`https://github.com/${r.repo}`} target="_blank" rel="noreferrer">{r.repo}<ExternalLink size={12} aria-hidden /></a><small>{portalName(r.portal_id)}</small></div>
                   <Field label="Portal"><select name="portalId" defaultValue={r.portal_id}>{P.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
-                  <Field label="Path prefixes (one per line)"><textarea name="prefixes" defaultValue={r.path_prefixes.join("\n")} style={{ minHeight: 60 }} /></Field>
-                  <div className="actions" style={{ gridColumn: "1 / -1" }}><button className="btn" type="submit">Save</button></div>
+                  <Field label="Path prefixes"><input type="text" name="prefixes" defaultValue={r.path_prefixes.join(", ")} placeholder="Blank = whole repository" /></Field>
+                  <div className="record-actions"><button className="btn ghost sm danger-text" type="submit" formAction={deleteRepo}>Remove</button><button className="btn sm" type="submit">Save</button></div>
                 </form>
-                <form action={deleteRepo} className="actions" style={{ marginTop: 8 }}><input type="hidden" name="id" value={r.id} /><button className="linklike" type="submit">Remove {r.repo} from {portalName(r.portal_id)}</button></form>
-              </div>
-            ))}
-            <form action={addRepo} className="card grid2 master-card">
-              <div className="section-title" style={{ gridColumn: "1 / -1", marginBottom: 0 }}>Add a repository</div>
-              <Field label="Repository (owner/name)"><input type="text" name="repo" placeholder="nisar-dropx/dropx-hrms" required /></Field>
-              <Field label="Portal"><select name="portalId" required defaultValue=""><option value="" disabled>Choose…</option>{P.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
-              <div style={{ gridColumn: "1 / -1" }}><Field label="Path prefixes (optional, one per line)"><textarea name="prefixes" style={{ minHeight: 60 }} /></Field></div>
-              <div style={{ gridColumn: "1 / -1" }} className="actions"><button className="btn" type="submit">Add repository</button></div>
-            </form>
+              ))}
+            </div>
+            <details className="card master-create">
+              <summary><span>Add a repository</span><small>Use owner/name from GitHub</small></summary>
+              <form action={addRepo} className="repo-record repo-add-record">
+                <Field label="Repository (owner/name)"><input type="text" name="repo" placeholder="nisar-dropx/dropx-hrms" required /></Field>
+                <Field label="Portal"><select name="portalId" required defaultValue=""><option value="" disabled>Choose…</option>{P.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+                <Field label="Path prefixes"><input type="text" name="prefixes" placeholder="Optional; separate with commas" /></Field>
+                <button className="btn sm" type="submit">Add repository</button>
+              </form>
+            </details>
           </div>
         )}
 
         {tab === "developers" && (
           <div className="stack">
             <p className="hint" style={{ margin: 0 }}>Commits are matched to a developer by GitHub login, then commit email, then commit name. Give each person the identities they commit with.</p>
-            {D.map((d) => (
-              <form key={d.id} action={updateDeveloper} className="card grid2 master-card">
-                <input type="hidden" name="id" value={d.id} />
-                <Field label="Name"><input type="text" name="displayName" defaultValue={d.display_name} maxLength={80} required /></Field>
-                <Field label="Signs in as"><select name="userId" defaultValue={d.user_id ?? ""}><option value="">Not linked</option>{staffUsers.map((u) => <option key={u.id} value={u.id}>{u.name || u.email} ({u.email})</option>)}</select></Field>
-                <Field label="GitHub logins"><textarea name="logins" defaultValue={d.github_logins.join("\n")} style={{ minHeight: 56 }} /></Field>
-                <Field label="Commit emails"><textarea name="emails" defaultValue={d.commit_author_emails.join("\n")} style={{ minHeight: 56 }} /></Field>
-                <Field label="Commit names"><textarea name="names" defaultValue={d.commit_author_names.join("\n")} style={{ minHeight: 56 }} /></Field>
-                <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between" }}>
-                  <label className="hint"><input type="checkbox" name="active" defaultChecked={d.is_active} /> Active</label><button className="btn" type="submit">Save</button>
-                </div>
+            <div className="master-records">
+              {D.map((d) => (
+                <form key={d.id} action={updateDeveloper} className="card master-card developer-record">
+                  <input type="hidden" name="id" value={d.id} />
+                  <Field label="Developer"><input type="text" name="displayName" defaultValue={d.display_name} maxLength={80} required /></Field>
+                  <Field label="Signs in as"><select name="userId" defaultValue={d.user_id ?? ""}><option value="">Not linked</option>{staffUsers.map((u) => <option key={u.id} value={u.id}>{u.name || u.email} ({u.email})</option>)}</select></Field>
+                  <label className="compact-check"><input type="checkbox" name="active" defaultChecked={d.is_active} /> Active</label>
+                  <button className="btn sm" type="submit">Save</button>
+                  <details className="identity-editor">
+                    <summary><span>Commit matching</span><small>{d.github_logins.length ? `@${d.github_logins.join(", @")}` : "Add GitHub login, email or author name"}</small></summary>
+                    <div className="identity-grid">
+                      <Field label="GitHub logins"><input type="text" name="logins" defaultValue={d.github_logins.join(", ")} placeholder="login, another-login" /></Field>
+                      <Field label="Commit emails"><input type="text" name="emails" defaultValue={d.commit_author_emails.join(", ")} placeholder="name@company.com" /></Field>
+                      <Field label="Commit names"><input type="text" name="names" defaultValue={d.commit_author_names.join(", ")} placeholder="Author names" /></Field>
+                    </div>
+                  </details>
+                </form>
+              ))}
+            </div>
+            <details className="card master-create">
+              <summary><span>Add a developer</span><small>Link a person and their commit identity</small></summary>
+              <form action={addDeveloper} className="developer-record developer-add-record">
+                <Field label="Developer"><input type="text" name="displayName" maxLength={80} required /></Field>
+                <Field label="Signs in as"><select name="userId" defaultValue=""><option value="">Not linked yet</option>{staffUsers.map((u) => <option key={u.id} value={u.id}>{u.name || u.email} ({u.email})</option>)}</select></Field>
+                <button className="btn sm" type="submit">Add developer</button>
+                <details className="identity-editor">
+                  <summary><span>Commit matching (optional)</span><small>Add GitHub login, email or author name</small></summary>
+                  <div className="identity-grid">
+                    <Field label="GitHub logins"><input type="text" name="logins" placeholder="login, another-login" /></Field>
+                    <Field label="Commit emails"><input type="text" name="emails" placeholder="name@company.com" /></Field>
+                    <Field label="Commit names"><input type="text" name="names" placeholder="Author names" /></Field>
+                  </div>
+                </details>
               </form>
-            ))}
-            <form action={addDeveloper} className="card grid2 master-card">
-              <div className="section-title" style={{ gridColumn: "1 / -1", marginBottom: 0 }}>Add a developer</div>
-              <Field label="Name"><input type="text" name="displayName" maxLength={80} required /></Field>
-              <Field label="Signs in as"><select name="userId" defaultValue=""><option value="">Not linked yet</option>{staffUsers.map((u) => <option key={u.id} value={u.id}>{u.name || u.email} ({u.email})</option>)}</select></Field>
-              <Field label="GitHub logins"><textarea name="logins" style={{ minHeight: 56 }} /></Field>
-              <Field label="Commit emails"><textarea name="emails" style={{ minHeight: 56 }} /></Field>
-              <Field label="Commit names"><textarea name="names" style={{ minHeight: 56 }} /></Field>
-              <div className="actions" style={{ alignItems: "flex-end" }}><button className="btn" type="submit">Add developer</button></div>
-            </form>
+            </details>
           </div>
         )}
 
@@ -140,16 +156,14 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
           <div className="stack">
             <p className="hint" style={{ margin: 0 }}>People appear here after their first sign-in. New people start as reporters. Only developers appear in the assignee list.</p>
             {U.map((u) => (
-              <form key={u.id} action={setUserAccess} className="card grid2 master-card">
+              <form key={u.id} action={setUserAccess} className="card master-card people-record">
                 <input type="hidden" name="id" value={u.id} />
-                <div style={{ overflowWrap: "anywhere" }}><strong>{u.name || u.email}</strong><div className="muted">{u.email}</div></div>
-                <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap" }}>
-                  <select name="role" defaultValue={u.role} disabled={u.id === user.id} style={{ width: "auto" }} aria-label="Role">
-                    {["reporter", "developer", "manager", "admin"].map((r) => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                  <label className="hint"><input type="checkbox" name="active" defaultChecked={u.is_active} disabled={u.id === user.id} /> Active</label>
-                  <button className="btn" type="submit" disabled={u.id === user.id}>{u.id === user.id ? "You" : "Save"}</button>
-                </div>
+                <div className="person-identity"><strong>{u.name || u.email}</strong><span>{u.email}</span></div>
+                <select name="role" defaultValue={u.role} disabled={u.id === user.id} aria-label={`Role for ${u.name || u.email}`}>
+                  {["reporter", "developer", "manager", "admin"].map((r) => <option key={r} value={r}>{r}</option>)}
+                </select>
+                <label className="compact-check"><input type="checkbox" name="active" defaultChecked={u.is_active} disabled={u.id === user.id} /> Active</label>
+                <button className="btn sm" type="submit" disabled={u.id === user.id}>{u.id === user.id ? "You" : "Save"}</button>
               </form>
             ))}
           </div>

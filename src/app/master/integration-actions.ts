@@ -37,6 +37,7 @@ export async function testIntegrationAction(fd: FormData) {
   await admin();
   const provider = providerOf(str(fd, "provider"));
   if (!provider) done(false, "Unknown integration.");
+  let error = false;
   try {
     const token = provider === "google" ? await googleOAuthAccessToken() : await runtimeGithubToken();
     if (!token) throw new Error("No connected account");
@@ -44,9 +45,9 @@ export async function testIntegrationAction(fd: FormData) {
     const res = await fetch(url, { headers: { authorization: `Bearer ${token}`, accept: "application/json", "user-agent": "dropx-it-support" }, cache: "no-store", signal: AbortSignal.timeout(12_000) });
     if (!res.ok) throw new Error(`Provider returned ${res.status}`);
     await noteIntegrationCheck(provider);
-    done(true, `${provider === "google" ? "Google Workspace" : "GitHub"} connection is healthy.`);
   } catch {
+    error = true;
     await noteIntegrationCheck(provider, "Connection test failed");
-    done(false, "Connection test failed. Reconnect the account and try again.");
   }
+  done(!error, error ? "Connection test failed. Reconnect the account and try again." : `${provider === "google" ? "Google Workspace" : "GitHub"} connection is healthy.`);
 }
