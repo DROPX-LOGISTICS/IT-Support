@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { BarChart3, ClipboardList, Columns3, Globe2, Home, Inbox, Menu, PlusCircle, Settings2, Ticket, type LucideIcon } from "lucide-react";
 
 export type NavCounts = { confirm: number; unassigned: number };
@@ -33,17 +33,20 @@ function groups(role: string, counts: NavCounts): Group[] {
 }
 
 const isCurrent = (path: string, href: string) => (href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`));
+const previewHref = (href: string, previewUserId?: string) => previewUserId ? `/admin/view-as?user=${encodeURIComponent(previewUserId)}&view=${encodeURIComponent(href)}` : href;
 
 /** The full menu: the sidebar on a computer, the drop-down on a phone. */
-export function NavLinks({ role, counts }: { role: string; counts: NavCounts }) {
+export function NavLinks({ role, counts, previewUserId }: { role: string; counts: NavCounts; previewUserId?: string }) {
   const path = usePathname();
+  const params = useSearchParams();
+  const activePath = previewUserId ? params.get("view") || "/" : path;
   return (
     <nav className="nav" aria-label="Main">
       {groups(role, counts).map((g) => (
         <div key={g.label} className="nav" role="group" aria-label={g.label}>
           <div className="nav-label">{g.label}</div>
           {g.items.map((l) => (
-            <Link key={l.href} href={l.href} aria-current={isCurrent(path, l.href) ? "page" : undefined}>
+            <Link key={l.href} href={previewHref(l.href, previewUserId)} aria-current={isCurrent(activePath, l.href) ? "page" : undefined}>
               <l.icon size={17} aria-hidden /> {l.label}
               {l.count ? <b title={`${l.count} ${l.countLabel}`}>{l.count > 99 ? "99+" : l.count}<span className="sr-only"> {l.countLabel}</span></b> : null}
             </Link>
@@ -78,15 +81,17 @@ export function MobileMenu({ children }: { children: React.ReactNode }) {
 }
 
 /** The most used pages, as a bar along the bottom of a phone. */
-export function TabBar({ role, counts }: { role: string; counts: NavCounts }) {
+export function TabBar({ role, counts, previewUserId }: { role: string; counts: NavCounts; previewUserId?: string }) {
   const path = usePathname();
+  const params = useSearchParams();
+  const activePath = previewUserId ? params.get("view") || "/" : path;
   const all = groups(role, counts).flatMap((g) => g.items);
   const order = role === "reporter" ? ["/", "/new", "/my-tickets"] : ["/", "/queue", "/new", "/board", "/my-tickets"];
   const items = order.map((h) => all.find((i) => i.href === h)).filter((i): i is Item => Boolean(i));
   return (
     <nav className="tabbar" aria-label="Quick links">
       {items.map((l) => (
-        <Link key={l.href} href={l.href} aria-current={isCurrent(path, l.href) ? "page" : undefined}>
+        <Link key={l.href} href={previewHref(l.href, previewUserId)} aria-current={isCurrent(activePath, l.href) ? "page" : undefined}>
           <l.icon size={20} aria-hidden />
           <span>{l.short ?? l.label}</span>
           {l.count ? <b aria-hidden>{l.count > 9 ? "9+" : l.count}</b> : null}

@@ -26,29 +26,30 @@ function UserCard({ user, preview = false }: { user: ShellUser; preview?: boolea
 
 /** The frame around every signed-in page: sidebar on a computer, top bar and bottom bar on a phone. */
 export function ShellFrame({ user, counts, viewUsers = [], width = "narrow", preview = false, children }: { user: ShellUser; counts: NavCounts; viewUsers?: ViewUser[]; width?: Width; preview?: boolean; children: React.ReactNode }) {
+  const homeHref = preview ? `/admin/view-as?user=${encodeURIComponent(user.id)}&view=%2F` : "/";
   return (
     <div className="app">
       <aside className="side">
-        <Link href="/" className="side-brand">
+        <Link href={homeHref} className="side-brand">
           <Logo />
           <span className="brand-product"><strong>IT Support</strong><small>Help desk</small></span>
         </Link>
         <div className="side-cta">{preview ? <span className="btn wide disabled-action" aria-disabled="true"><PlusCircle size={17} aria-hidden /> Raise a ticket</span> : <Link className="btn wide" href="/new"><PlusCircle size={17} aria-hidden /> Raise a ticket</Link>}</div>
-        <div className="side-scroll"><NavLinks role={user.role} counts={counts} /></div>
+        <div className="side-scroll"><NavLinks role={user.role} counts={counts} previewUserId={preview ? user.id : undefined} /></div>
         {!preview && user.role === "admin" && <div className="side-view-as"><ViewAsUserButton users={viewUsers} /></div>}
         <UserCard user={user} preview={preview} />
       </aside>
 
       <div className="main">
         <header className="topbar">
-          <Link href="/" aria-label="DropX IT Support, home"><Logo /></Link>
+          <Link href={homeHref} aria-label="DropX IT Support, home"><Logo /></Link>
           <span className="spacer" />
           {!preview && user.role === "admin" && <ViewAsUserButton users={viewUsers} />}
           {!preview && <Link className="btn sm" href="/new"><PlusCircle size={15} aria-hidden /> Raise</Link>}
-          <MobileMenu><NavLinks role={user.role} counts={counts} /><UserCard user={user} preview={preview} /></MobileMenu>
+          <MobileMenu><NavLinks role={user.role} counts={counts} previewUserId={preview ? user.id : undefined} /><UserCard user={user} preview={preview} /></MobileMenu>
         </header>
         <main className={`container${width === "narrow" ? "" : ` w-${width}`}`}>{children}</main>
-        <TabBar role={user.role} counts={counts} />
+        <TabBar role={user.role} counts={counts} previewUserId={preview ? user.id : undefined} />
       </div>
     </div>
   );
