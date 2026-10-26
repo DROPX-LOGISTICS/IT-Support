@@ -127,10 +127,11 @@ export function fallbackTicketDraft(mode: TicketDraftMode, notes: string, intern
   if (internal) return text || "Please review the ticket and add the technical update.";
   const dates = [...text.matchAll(/\b\d{1,2}\/\d{1,2}\/\d{4}\b/g)].map((m) => m[0]);
   const date = dates[0];
-  const times = [...text.matchAll(/\b\d{1,2}:\d{2}\b/g)].map((m) => m[0]);
+  const inTime = text.match(/\bIN\s+(?:at\s+)?(\d{1,2}:\d{2})\b/i)?.[1];
+  const outTime = text.match(/\bOUT\s+(?:at\s+)?(\d{1,2}:\d{2})\b/i)?.[1];
   const name = text.match(/\bFor\s+([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*)\s*:/)?.[1];
-  if (/overnight/i.test(text) && date && times.length >= 2) {
-    return `The overnight attendance issue has been addressed. Valid overnight shifts are now accepted when the OUT time is earlier than the IN time. Please use ${date} as${name ? ` ${name}'s` : " the"} shift start date, with IN at ${times[0]} and OUT at ${times[1]}.${dates[1] ? ` Do not use ${dates[1]} as the attendance date.` : ""}`;
+  if (/overnight/i.test(text) && date && inTime && outTime) {
+    return `The overnight attendance issue has been fixed. Valid overnight shifts are now accepted when the OUT time is earlier than the IN time. Please use ${date} as${name ? ` ${name}'s` : " the"} shift start date, with IN at ${inTime} and OUT at ${outTime}.${dates[1] ? ` Do not use ${dates[1]} as the attendance date.` : ""}`;
   }
   const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean).slice(0, 3);
   return sentences.join(" ") || "The team has prepared an update for this ticket. Please review the ticket and confirm the result.";
@@ -159,7 +160,9 @@ export async function refineTicketText(mode: TicketDraftMode, source: string, co
     mode === "status" ? "Explain what was fixed or delivered and what the reporter should check, using only the writer-provided notes." : "Do not claim the issue is fixed unless the writer-provided notes say it is fixed.",
   ].join("\n");
   const data = await generateTicketDraft(runtime.apiKey, runtime.model, prompt);
-  const output = geminiTextFromResponse(data).replace(/\r\n?/g, "\n").trim();
+  let output = geminiTextFromResponse(data).replace(/\r\n?/g, "\n").trim();
+  const reporterLeak = !context.internal && /(?:commit|push(?:ed)?|deploy|branch|form\/api|api|code|23ae4038)/i.test(output);
+  if (!context.internal && (output === notes || reporterLeak)) output = fallbackTicketDraft(mode, notes, false);
   if (!output || output.length > 2000) throw new GeminiRequestError("response_format", "Gemini returned an unusable ticket draft");
   return output;
 }
