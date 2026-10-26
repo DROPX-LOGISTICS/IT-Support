@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
-import { Loader2 } from "lucide-react";
-import { changeStatus, saveDetails, type ActionResult } from "@/app/tickets/actions";
+import { Loader2, Sparkles } from "lucide-react";
+import { changeStatus, draftTicketText, saveDetails, type ActionResult } from "@/app/tickets/actions";
 import { PRIORITIES, PRIORITY_LABEL, type Priority, type Status, type TicketType } from "@/lib/tickets";
 import { DONE } from "@/lib/status-flow";
 
@@ -15,12 +15,15 @@ const Msg = ({ s }: { s: ActionResult }) => (s.message ? <div className={s.ok ? 
 
 export function StatusForm(props: { ticketId: string; status: Status; options: Status[] }) {
   const [state, action] = useFormState(changeStatus, initial);
+  const [aiState, aiAction] = useFormState(draftTicketText, initial);
   const [to, setTo] = useState<string>(props.options[0] ?? "");
+  const [update, setUpdate] = useState("");
   if (!props.options.length) return <p className="muted" style={{ margin: 0 }}>No status changes are available from “{props.status}”.</p>;
   const needsReason = to === "Blocked" || to === "Not viable";
   return (
     <form action={action} className="stack" style={{ ["--gap" as string]: "12px" }}>
       <input type="hidden" name="ticketId" value={props.ticketId} />
+      <input type="hidden" name="mode" value="status" />
       <input type="hidden" name="seen" value={props.status} />
       <div>
         <label className="field" htmlFor="to">Move to</label>
@@ -37,7 +40,9 @@ export function StatusForm(props: { ticketId: string; status: Status; options: S
       {to === DONE && (
         <div>
           <label className="field" htmlFor="update">Update for the reporter <span className="hint">(plain words, no technical terms)</span></label>
-          <textarea id="update" name="update" style={{ minHeight: 80 }} placeholder="What was fixed or delivered, and what they should check." />
+          <textarea id="update" name="update" value={update} onChange={(event) => setUpdate(event.target.value)} style={{ minHeight: 80 }} placeholder="What was fixed or delivered, and what they should check." />
+          <button className="btn ghost sm ai-button" type="submit" formAction={aiAction}><Sparkles size={15} aria-hidden /> Draft with AI</button>
+          {aiState.message && <div className={aiState.ok ? "ok-text" : "err"} role="status">{aiState.message}</div>}
         </div>
       )}
       <div className="actions" style={{ justifyContent: "space-between" }}><Msg s={state} /><Submit>Change status</Submit></div>
@@ -51,8 +56,11 @@ export function DetailsForm(props: {
   developers: { id: string; name: string }[];
 }) {
   const [state, action] = useFormState(saveDetails, initial);
+  const [aiState, aiAction] = useFormState(draftTicketText, initial);
   const [dirty, setDirty] = useState(false);
+  const [developerUpdate, setDeveloperUpdate] = useState(props.developerUpdate ?? "");
   useEffect(() => { if (state.ok) setDirty(false); }, [state]);
+  useEffect(() => { if (aiState.draft) { setDeveloperUpdate(aiState.draft); setDirty(true); } }, [aiState.draft]);
   const checkDirty = (event: React.FormEvent<HTMLFormElement>) => {
     const data = new FormData(event.currentTarget);
     const same = (name: string, original: string) => String(data.get(name) ?? "") === original;
@@ -65,6 +73,7 @@ export function DetailsForm(props: {
   return (
     <form action={action} onInput={checkDirty} onChange={checkDirty} className="stack" style={{ ["--gap" as string]: "14px" }}>
       <input type="hidden" name="ticketId" value={props.ticketId} />
+      <input type="hidden" name="mode" value="update" />
       <div className="grid2">
         <div>
           <label className="field" htmlFor="assignee">Assignee</label>
@@ -100,7 +109,9 @@ export function DetailsForm(props: {
       )}
       <div>
         <label className="field" htmlFor="developerUpdate">Update for the reporter <span className="hint">(shown on their ticket)</span></label>
-        <textarea id="developerUpdate" name="developerUpdate" defaultValue={props.developerUpdate ?? ""} maxLength={2000} style={{ minHeight: 80 }} />
+        <textarea id="developerUpdate" name="developerUpdate" value={developerUpdate} onChange={(event) => setDeveloperUpdate(event.target.value)} maxLength={2000} style={{ minHeight: 80 }} />
+        <button className="btn ghost sm ai-button" type="submit" formAction={aiAction}><Sparkles size={15} aria-hidden /> Draft with AI</button>
+        {aiState.message && <div className={aiState.ok ? "ok-text" : "err"} role="status">{aiState.message}</div>}
       </div>
       <div>
         <label className="field" htmlFor="links">Links <span className="hint">(commit, pull request, page; one per line)</span></label>

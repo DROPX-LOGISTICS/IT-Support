@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
-import { Loader2, Send } from "lucide-react";
-import { addComment, type ActionResult } from "@/app/tickets/actions";
+import { Loader2, Send, Sparkles } from "lucide-react";
+import { addComment, draftTicketText, type ActionResult } from "@/app/tickets/actions";
 
 const initial: ActionResult = { ok: false, message: "" };
 
@@ -13,19 +13,25 @@ function Send_({ disabled }: { disabled: boolean }) {
 
 export function CommentForm({ ticketId, staff }: { ticketId: string; staff: boolean }) {
   const [state, action] = useFormState(addComment, initial);
+  const [aiState, aiAction] = useFormState(draftTicketText, initial);
   const ref = useRef<HTMLFormElement>(null);
   const [body, setBody] = useState("");
   useEffect(() => { if (state.ok) ref.current?.reset(); }, [state]);
   useEffect(() => { if (state.ok) setBody(""); }, [state]);
+  useEffect(() => { if (aiState.draft) setBody(aiState.draft); }, [aiState.draft]);
   return (
     <form ref={ref} action={action} style={{ marginTop: 14 }}>
       <input type="hidden" name="ticketId" value={ticketId} />
+      <input type="hidden" name="mode" value="comment" />
       <textarea name="body" value={body} onChange={(e) => setBody(e.target.value)} maxLength={5000} placeholder="Write a comment…" aria-label="Comment" style={{ minHeight: 80 }} />
       <div className="actions" style={{ justifyContent: "space-between", marginTop: 8 }}>
         {staff ? <label className="hint" style={{ display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" name="internal" /> Internal note (developers only)</label> : <span />}
-        <Send_ disabled={!body.trim()} />
+        <div className="actions" style={{ gap: 7 }}>
+          <button className="btn ghost sm ai-button" type="submit" formAction={aiAction}><Sparkles size={15} aria-hidden /> Draft with AI</button>
+          <Send_ disabled={!body.trim()} />
+        </div>
       </div>
-      {state.message && <div className={state.ok ? "ok-text" : "err"} role="status">{state.message}</div>}
+      {(state.message || aiState.message) && <div className={state.ok || aiState.ok ? "ok-text" : "err"} role="status">{state.message || aiState.message}</div>}
     </form>
   );
 }

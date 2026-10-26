@@ -9,13 +9,15 @@ import { isDateString } from "@/lib/commits";
 import { istLocalToIso, parseMeetLink } from "@/lib/meet";
 import { cancelMeetForTicket } from "@/lib/meet-server";
 import { notify, retryEmail } from "@/lib/notifications";
+import { classifyGeminiFailure, geminiFailureMessage } from "@/lib/gemini-errors";
+import { refineTicketText, type TicketDraftMode } from "@/lib/gemini";
 import { requireUser } from "@/lib/session";
 import { serviceClient } from "@/lib/supabase/admin";
 import { userClient } from "@/lib/supabase/server";
 import { DONE, checkConfirmation, checkTransition } from "@/lib/status-flow";
 import { STATUSES, type Status } from "@/lib/tickets";
 
-export type ActionResult = { ok: boolean; message: string };
+export type ActionResult = { ok: boolean; message: string; draft?: string };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const str = (v: FormDataEntryValue | null) => String(v ?? "").trim();
 
@@ -132,6 +134,28 @@ export async function addComment(_p: ActionResult, fd: FormData): Promise<Action
   }
   refresh(id);
   return { ok: true, message: internal ? "Internal note added." : "Comment added." };
+}
+
+export async function draftTicketText(_p: ActionResult, fd: FormData): Promise<ActionResult> {
+  const ctx = await context();
+  if (!ctx) return { ok: false, message: "Not configured." };
+  const id = str(fd.get("ticketId"));
+  const mode = str(fd.get("mode")) as TicketDraftMode;
+  const source = str(fd.get(mode === "comment" ? "body" : mode === "status" ? "update" : "developerUpdate"));
+  if (!UUID.test(id) || !["status", "update", "comment"].includes(mode)) return { ok: false, message: "Ticket draft not found." };
+  if (mode !== "comment" && !isDev(ctx)) return { ok: false, message: "You are not allowed to draft this update." };
+  const { data: ticket } = await ctx.supabase.from("support_tickets").select("id,number,title,type,status,description,reporter_id").eq("id", id).maybeSingle();
+  if (!ticket || (!isDev(ctx) && ticket.reporter_id !== ctx.user.id)) return { ok: false, message: "Ticket not found." };
+  try {
+    const draft = await refineTicketText(mode, source, {
+      number: ticket.number, title: ticket.title, type: ticket.type, status: ticket.status, description: ticket.description,
+    });
+    return { ok: true, message: "AI draft ready. Review it before posting.", draft };
+  } catch (error) {
+    const failure = classifyGeminiFailure(error);
+    await import("@/lib/integrations").then(({ noteGeminiCheck }) => noteGeminiCheck(geminiFailureMessage(failure.code))).catch(() => {});
+    return { ok: false, message: geminiFailureMessage(failure.code) };
+  }
 }
 
 export async function confirmTicket(_p: ActionResult, fd: FormData): Promise<ActionResult> {
