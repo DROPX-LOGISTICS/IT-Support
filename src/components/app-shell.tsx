@@ -34,6 +34,7 @@ export function ShellFrame({ user, counts, viewUsers = [], width = "narrow", chi
         </Link>
         <div className="side-cta"><Link className="btn wide" href="/new"><PlusCircle size={17} aria-hidden /> Raise a ticket</Link></div>
         <div className="side-scroll"><NavLinks role={user.role} counts={counts} /></div>
+        {user.role === "admin" && <div className="side-view-as"><ViewAsUserButton users={viewUsers} /></div>}
         <UserCard user={user} />
       </aside>
 
