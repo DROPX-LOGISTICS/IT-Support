@@ -27,7 +27,7 @@ export type IntegrationSummary = {
   source: "dashboard" | "environment" | "none";
   storageReady: boolean;
 };
-export const DEFAULT_GEMINI_MODEL = "gemini-3.5-flash";
+export const DEFAULT_GEMINI_MODEL = "gemini-2.5-flash";
 export type GeminiIntegrationRecord = {
   apiKey: string;
   model: string;

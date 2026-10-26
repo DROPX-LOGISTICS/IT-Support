@@ -11,6 +11,13 @@ function Send_({ disabled }: { disabled: boolean }) {
   return <button className="btn" type="submit" disabled={pending || disabled}>{pending ? <Loader2 size={16} className="spin" aria-hidden /> : <Send size={16} aria-hidden />} Post</button>;
 }
 
+function DraftButton({ action }: { action: (payload: FormData) => void }) {
+  const { pending } = useFormStatus();
+  return <button className="btn ghost sm ai-button" type="submit" formAction={action} disabled={pending} aria-busy={pending}>
+    {pending ? <span className="spin" aria-hidden>◌</span> : <Sparkles size={15} aria-hidden />} {pending ? "Drafting…" : "Draft with AI"}
+  </button>;
+}
+
 export function CommentForm({ ticketId, staff }: { ticketId: string; staff: boolean }) {
   const [state, action] = useFormState(addComment, initial);
   const [aiState, aiAction] = useFormState(draftTicketText, initial);
@@ -24,10 +31,15 @@ export function CommentForm({ ticketId, staff }: { ticketId: string; staff: bool
       <input type="hidden" name="ticketId" value={ticketId} />
       <input type="hidden" name="mode" value="comment" />
       <textarea name="body" value={body} onChange={(e) => setBody(e.target.value)} maxLength={5000} placeholder="Write a comment…" aria-label="Comment" style={{ minHeight: 80 }} />
+      <div className="ai-compose">
+        <label className="sr-only" htmlFor={`comment-ai-instruction-${ticketId}`}>Describe what the AI should write</label>
+        <input id={`comment-ai-instruction-${ticketId}`} name="aiInstruction" className="ai-prompt" maxLength={1200} placeholder="Describe your message… e.g. ask the reporter to confirm the result" />
+        <span className="ai-hint">AI uses the ticket details and your instruction. Review before posting.</span>
+      </div>
       <div className="actions" style={{ justifyContent: "space-between", marginTop: 8 }}>
         {staff ? <label className="hint" style={{ display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" name="internal" /> Internal note (developers only)</label> : <span />}
         <div className="actions" style={{ gap: 7 }}>
-          <button className="btn ghost sm ai-button" type="submit" formAction={aiAction}><Sparkles size={15} aria-hidden /> Draft with AI</button>
+          <DraftButton action={aiAction} />
           <Send_ disabled={!body.trim()} />
         </div>
       </div>

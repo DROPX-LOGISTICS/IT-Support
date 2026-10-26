@@ -11,6 +11,12 @@ function Submit({ children, disabled = false }: { children: React.ReactNode; dis
   const { pending } = useFormStatus();
   return <button className="btn" type="submit" disabled={pending || disabled}>{pending && <Loader2 size={16} className="spin" aria-hidden />}{children}</button>;
 }
+function DraftButton({ action }: { action: (payload: FormData) => void }) {
+  const { pending } = useFormStatus();
+  return <button className="btn ghost sm ai-button" type="submit" formAction={action} disabled={pending} aria-busy={pending}>
+    {pending ? <Loader2 size={15} className="spin" aria-hidden /> : <Sparkles size={15} aria-hidden />} {pending ? "Drafting…" : "Draft with AI"}
+  </button>;
+}
 const Msg = ({ s }: { s: ActionResult }) => (s.message ? <div className={s.ok ? "ok-text" : "err"} role="status">{s.message}</div> : null);
 
 export function StatusForm(props: { ticketId: string; status: Status; options: Status[] }) {
@@ -41,7 +47,12 @@ export function StatusForm(props: { ticketId: string; status: Status; options: S
         <div>
           <label className="field" htmlFor="update">Update for the reporter <span className="hint">(plain words, no technical terms)</span></label>
           <textarea id="update" name="update" value={update} onChange={(event) => setUpdate(event.target.value)} style={{ minHeight: 80 }} placeholder="What was fixed or delivered, and what they should check." />
-          <button className="btn ghost sm ai-button" type="submit" formAction={aiAction}><Sparkles size={15} aria-hidden /> Draft with AI</button>
+          <div className="ai-compose">
+            <label className="sr-only" htmlFor={`status-ai-instruction-${props.ticketId}`}>Describe what the AI should write</label>
+            <input id={`status-ai-instruction-${props.ticketId}`} name="aiInstruction" className="ai-prompt" maxLength={1200} placeholder="Describe your message… e.g. explain the fix and what the reporter should check" />
+            <span className="ai-hint">AI uses the ticket details and your instruction. Review before changing status.</span>
+            <DraftButton action={aiAction} />
+          </div>
           {aiState.message && <div className={aiState.ok ? "ok-text" : "err"} role="status">{aiState.message}</div>}
         </div>
       )}
@@ -110,7 +121,12 @@ export function DetailsForm(props: {
       <div>
         <label className="field" htmlFor="developerUpdate">Update for the reporter <span className="hint">(shown on their ticket)</span></label>
         <textarea id="developerUpdate" name="developerUpdate" value={developerUpdate} onChange={(event) => setDeveloperUpdate(event.target.value)} maxLength={2000} style={{ minHeight: 80 }} />
-        <button className="btn ghost sm ai-button" type="submit" formAction={aiAction}><Sparkles size={15} aria-hidden /> Draft with AI</button>
+        <div className="ai-compose">
+          <label className="sr-only" htmlFor={`details-ai-instruction-${props.ticketId}`}>Describe what the AI should write</label>
+          <input id={`details-ai-instruction-${props.ticketId}`} name="aiInstruction" className="ai-prompt" maxLength={1200} placeholder="Describe your message… e.g. summarize the delivered fix in plain words" />
+          <span className="ai-hint">AI uses the ticket details, links, and your instruction. Review before saving.</span>
+          <DraftButton action={aiAction} />
+        </div>
         {aiState.message && <div className={aiState.ok ? "ok-text" : "err"} role="status">{aiState.message}</div>}
       </div>
       <div>

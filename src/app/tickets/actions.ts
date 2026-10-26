@@ -142,6 +142,7 @@ export async function draftTicketText(_p: ActionResult, fd: FormData): Promise<A
   const id = str(fd.get("ticketId"));
   const mode = str(fd.get("mode")) as TicketDraftMode;
   const source = str(fd.get(mode === "comment" ? "body" : mode === "status" ? "update" : "developerUpdate"));
+  const instruction = str(fd.get("aiInstruction"));
   if (!UUID.test(id) || !["status", "update", "comment"].includes(mode)) return { ok: false, message: "Ticket draft not found." };
   if (mode !== "comment" && !isDev(ctx)) return { ok: false, message: "You are not allowed to draft this update." };
   const { data: ticket } = await ctx.supabase.from("support_tickets").select("id,number,title,type,status,description,reporter_id,links").eq("id", id).maybeSingle();
@@ -150,6 +151,7 @@ export async function draftTicketText(_p: ActionResult, fd: FormData): Promise<A
     const draft = await refineTicketText(mode, source, {
       number: ticket.number, title: ticket.title, type: ticket.type, status: ticket.status, description: ticket.description,
       links: [...new Set([...((ticket.links as string[] | null) ?? []), ...str(fd.get("links")).split(/\s+/).filter(Boolean)])],
+      instruction,
     });
     return { ok: true, message: "AI draft ready. Review it before posting.", draft };
   } catch (error) {

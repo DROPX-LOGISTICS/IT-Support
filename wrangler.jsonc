@@ -22,6 +22,6 @@
     "GOOGLE_CALENDAR_ORGANIZER": "tech@dropxlogistics.com",
     "GOOGLE_SHEETS_OWNER": "tech@dropxlogistics.com",
     "GOOGLE_ATTACHMENTS_FOLDER_ID": "1xdRl8br3fR2Gl_DRMvGXPJs5-EZygOQu",
-    "GEMINI_MODEL": "gemini-3.5-flash"
+    "GEMINI_MODEL": "gemini-2.5-flash"
   }
 }

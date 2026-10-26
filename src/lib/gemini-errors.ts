@@ -55,7 +55,7 @@ export function geminiFailureFromHttp(status: number, providerCode = "", provide
     return { code: "invalid_key", status, providerCode };
   }
   if (status === 429) return { code: "quota", status, providerCode };
-  if (status === 404 || detail.includes("model_not_found") || /model.+not found/.test(detail)) {
+  if (status === 404 || detail.includes("model_not_found") || /model.+(?:not found|not available|does not exist|unsupported)/.test(detail)) {
     return { code: "model", status, providerCode };
   }
   if (
