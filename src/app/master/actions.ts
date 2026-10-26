@@ -144,8 +144,8 @@ export async function setUserAccess(fd: FormData) {
 
 export async function inviteUser(fd: FormData) {
   await admin();
-  const email = str(fd, "email").toLowerCase();
-  const name = str(fd, "name").slice(0, 100);
+  const email = str(fd, "inviteEmail").toLowerCase();
+  const name = str(fd, "inviteName").slice(0, 100);
   const domain = allowedDomain();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !domain || !email.endsWith(`@${domain}`)) done("settings", `Invite a verified ${domain || "company"} email address.`, false);
   const service = serviceClient();
