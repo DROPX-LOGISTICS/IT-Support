@@ -15,7 +15,7 @@ type Row = { id: string; number: string; title: string; type: TicketType; priori
 const select = "id,number,title,type,priority,status,created_at,assignee_id,reporter_id,portal:support_portals(name)";
 
 function PreviewBanner({ person }: { person: Person }) {
-  return <div className="view-as-preview-banner"><Eye size={17} aria-hidden /><div><strong>Viewing as {person.name || person.email}</strong><span>Same role-based workspace · read-only preview</span></div><span className="system-status live"><ShieldCheck size={14} aria-hidden /> Safe mode</span><Link className="back" href="/">Exit preview</Link></div>;
+  return <div className="view-as-preview-banner"><Eye size={17} aria-hidden /><div><strong>Viewing as {person.name || person.email}</strong><span>Same role-based workspace · read-only preview</span></div><span className="system-status live"><ShieldCheck size={14} aria-hidden /> Safe mode</span><a className="back" href="/api/admin/view-as?exit=1">Exit preview</a></div>;
 }
 
 function TicketList({ rows, staff }: { rows: Row[]; staff: boolean }) {

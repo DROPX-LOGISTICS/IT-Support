@@ -185,6 +185,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
                   {["reporter", "developer", "manager", "admin"].map((r) => <option key={r} value={r}>{r}</option>)}
                 </select>
                 <label className="compact-check"><input type="checkbox" name="active" defaultChecked={u.is_active} disabled={u.id === user.id} /> Active</label>
+                {u.id !== user.id && <a className="btn ghost sm" href={`/api/admin/view-as?user=${encodeURIComponent(u.id)}`}>View</a>}
                 <button className="btn sm" type="submit" disabled={u.id === user.id}>{u.id === user.id ? "You" : "Save"}</button>
               </form>
             ))}

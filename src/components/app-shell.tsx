@@ -34,7 +34,7 @@ export function ShellFrame({ user, counts, viewUsers = [], width = "narrow", pre
           <Logo />
           <span className="brand-product"><strong>IT Support</strong><small>Help desk</small></span>
         </Link>
-        <div className="side-cta">{preview ? <span className="btn wide disabled-action" aria-disabled="true"><PlusCircle size={17} aria-hidden /> Raise a ticket</span> : <Link className="btn wide" href="/new"><PlusCircle size={17} aria-hidden /> Raise a ticket</Link>}</div>
+        <div className="side-cta">{inPreview ? <span className="btn wide disabled-action" aria-disabled="true"><PlusCircle size={17} aria-hidden /> Raise a ticket</span> : <Link className="btn wide" href="/new"><PlusCircle size={17} aria-hidden /> Raise a ticket</Link>}</div>
         <div className="side-scroll"><NavLinks role={user.role} counts={counts} /></div>
         {!inPreview && user.role === "admin" && <div className="side-view-as"><ViewAsUserButton users={viewUsers} /></div>}
         <UserCard user={user} preview={inPreview} />
@@ -49,7 +49,7 @@ export function ShellFrame({ user, counts, viewUsers = [], width = "narrow", pre
           <MobileMenu><NavLinks role={user.role} counts={counts} /><UserCard user={user} preview={inPreview} /></MobileMenu>
         </header>
         <main className={`container${width === "narrow" ? "" : ` w-${width}`}`}>
-          {inPreview && <div className="preview-session-bar"><Eye size={16} aria-hidden /><div><strong>Viewing as {user.name || user.email}</strong><span>Same role-based access · read-only preview</span></div><span className="system-status live"><ShieldCheck size={13} aria-hidden /> Safe mode</span><Link className="back" href="/api/admin/view-as?exit=1">Exit preview</Link></div>}
+          {inPreview && <div className="preview-session-bar"><Eye size={16} aria-hidden /><div><strong>Viewing as {user.name || user.email}</strong><span>Same role-based access · read-only preview</span></div><span className="system-status live"><ShieldCheck size={13} aria-hidden /> Safe mode</span><a className="back" href="/api/admin/view-as?exit=1">Exit preview</a></div>}
           {children}
         </main>
         <TabBar role={user.role} counts={counts} />
