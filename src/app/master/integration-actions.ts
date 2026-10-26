@@ -74,14 +74,14 @@ export async function testIntegrationAction(fd: FormData) {
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { error?: { message?: string } };
-        throw new GoogleApiError(body.error?.message ?? `Google returned ${res.status}`, res.status);
+        throw new GoogleApiError(`Drive API check failed: ${body.error?.message ?? `Google returned ${res.status}`}`, res.status);
       }
       const gmail = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
         headers: { authorization: `Bearer ${token}`, accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(12_000),
       });
       if (!gmail.ok) {
         const body = await gmail.json().catch(() => ({})) as { error?: { message?: string } };
-        throw new GoogleApiError(body.error?.message ?? `Gmail returned ${gmail.status}`, gmail.status);
+        throw new GoogleApiError(`Gmail API check failed: ${body.error?.message ?? `Gmail returned ${gmail.status}`}`, gmail.status);
       }
     } else {
       const token = await runtimeGithubToken();
