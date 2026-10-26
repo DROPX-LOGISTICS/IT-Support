@@ -94,15 +94,18 @@ export default async function HomePage() {
         </section>
         {(mine.error || team.error) && <div className="banner bad" role="alert">We could not load everything. Please refresh.</div>}
 
-        <section className="summary-cards" aria-label="Ticket summary">
-          {summaryCards.map(({ icon: Icon, ...card }) => (
-            <Link key={card.label} className={`summary-card${card.tone ? ` ${card.tone}` : ""}`} href={card.href}>
-              <span className="summary-card-icon"><Icon size={17} aria-hidden /></span>
-              <span className="summary-card-value">{card.value}</span>
-              <span className="summary-card-label">{card.label}</span>
-              <ArrowRight className="summary-card-arrow" size={15} aria-hidden />
-            </Link>
-          ))}
+        <section className="summary-panel" aria-label="Ticket summary">
+          <div className="summary-panel-head"><span>Ticket overview</span><span className="summary-live"><i /> Live</span></div>
+          <div className="summary-cards">
+            {summaryCards.map(({ icon: Icon, ...card }) => (
+              <Link key={card.label} className={`summary-card${card.tone ? ` ${card.tone}` : ""}`} href={card.href}>
+                <span className="summary-card-icon"><Icon size={17} aria-hidden /></span>
+                <span className="summary-card-value">{card.value}</span>
+                <span className="summary-card-label">{card.label}</span>
+                <ArrowRight className="summary-card-arrow" size={15} aria-hidden />
+              </Link>
+            ))}
+          </div>
         </section>
 
         {waiting.length > 0 && (
