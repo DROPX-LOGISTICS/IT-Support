@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, CalendarDays, CheckCircle2, ExternalLink, Github, KeyRound, Mail, Pencil, Plug, ShieldCheck, Sparkles, Table2 } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle2, ExternalLink, Github, KeyRound, Mail, Pencil, Plug, ShieldCheck, Sparkles, Table2, UserPlus, Eye } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { ConnectionTestButton } from "@/components/connection-test-button";
@@ -15,7 +15,7 @@ import { appUrl } from "@/lib/config";
 import { integrationSummaries } from "@/lib/integrations";
 import { oauthCallback } from "@/lib/oauth";
 import { PRIORITIES, PRIORITY_LABEL } from "@/lib/tickets";
-import { updateSettings, addDeveloper, addPortal, addRepo, deleteRepo, dismissUnmatched, mapUnmatched, seedKnownSystems, setUserAccess, updateDeveloper, updatePortal, updateRepo } from "./actions";
+import { updateSettings, addDeveloper, addPortal, addRepo, deleteRepo, dismissUnmatched, inviteUser, mapUnmatched, seedKnownSystems, setUserAccess, updateDeveloper, updatePortal, updateRepo } from "./actions";
 import {
   disconnectGeminiAction, disconnectIntegrationAction, saveGeminiAction, saveOAuthAppAction, testGeminiAction, testIntegrationAction,
 } from "./integration-actions";
@@ -29,7 +29,7 @@ type Dev = { id: string; user_id: string | null; display_name: string; github_lo
 type Person = { id: string; email: string; name: string; role: string; is_active: boolean };
 type Unmatched = { id: string; repo: string; sha: string; commit_date: string; author_login: string | null; author_name: string | null; author_email: string | null; subject: string };
 
-export default async function MasterPage({ searchParams }: { searchParams: { tab?: string; saved?: string; error?: string } }) {
+export default async function MasterPage({ searchParams }: { searchParams: { tab?: string; saved?: string; error?: string; view?: string } }) {
   const session = await requireUser();
   if (session.state === "not_configured") return <NotConfigured missing={session.missing} />;
   const { user } = session;
@@ -48,6 +48,7 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
   const cfg = await loadSettings(supabase);
   const integrations = tab === "integrations" ? await integrationSummaries() : null;
   const staffUsers = U.filter((u) => u.role !== "reporter");
+  const viewedPerson = U.find((u) => u.id === searchParams.view);
   const portalName = (id: string) => P.find((p) => p.id === id)?.name ?? "";
   const Field = ({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) => <div className={className}><label className="field">{label}</label>{children}</div>;
 
@@ -184,15 +185,26 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
                   {["reporter", "developer", "manager", "admin"].map((r) => <option key={r} value={r}>{r}</option>)}
                 </select>
                 <label className="compact-check"><input type="checkbox" name="active" defaultChecked={u.is_active} disabled={u.id === user.id} /> Active</label>
+                <Link className="btn ghost sm" href={`/master?tab=people&view=${u.id}`}><Eye size={14} aria-hidden /> View</Link>
                 <button className="btn sm" type="submit" disabled={u.id === user.id}>{u.id === user.id ? "You" : "Save"}</button>
               </form>
             ))}
+            {viewedPerson && <section className="card person-view"><div className="section-title"><Eye size={16} aria-hidden /> User details</div><div className="person-view-grid"><div><span className="field">Name</span><strong>{viewedPerson.name || "Not set"}</strong></div><div><span className="field">Email</span><strong>{viewedPerson.email}</strong></div><div><span className="field">Role</span><strong>{viewedPerson.role}</strong></div><div><span className="field">Account status</span><strong>{viewedPerson.is_active ? "Active" : "Disabled"}</strong></div></div></section>}
           </div>
         )}
 
 
         {tab === "settings" && (
           <form action={updateSettings} className="stack">
+            <section className="card access-settings-card">
+              <div className="section-title"><ShieldCheck size={16} aria-hidden /> User & role access</div>
+              <p className="hint" style={{ marginTop: 0 }}>Invite company users here. New users start as reporters; adjust their role under People & access after their first sign-in.</p>
+              <div className="invite-row"><label className="field">Work email<input name="inviteEmail" type="email" placeholder="name@dropxlogistics.com" /></label><label className="field">Name (optional)<input name="inviteName" type="text" placeholder="Full name" /></label><button className="btn sm" type="submit" formAction={inviteUser}><UserPlus size={14} aria-hidden /> Invite user</button></div>
+              <div className="table-wrap"><table className="plain access-table"><thead><tr><th>Role</th><th>Access</th><th>Users</th></tr></thead><tbody>
+                {[["reporter", "Raise and track own tickets", U.filter((x) => x.role === "reporter").length], ["developer", "Team queue, board, assigned work", U.filter((x) => x.role === "developer").length], ["manager", "Team read-only updates and insights", U.filter((x) => x.role === "manager").length], ["admin", "Full configuration and access control", U.filter((x) => x.role === "admin").length]].map(([role, access, count]) => <tr key={String(role)}><td><strong>{role}</strong></td><td>{access}</td><td className="n">{count}</td></tr>)}
+              </tbody></table></div>
+              <p className="hint" style={{ marginBottom: 0 }}>Manage individual users in <Link href="/master?tab=people">People & access</Link>.</p>
+            </section>
             <section className="card">
               <div className="section-title">Targets (hours, wall-clock)</div>
               <p className="hint" style={{ marginTop: 0 }}>A ticket past its response or fix target shows as overdue. A reopened ticket&apos;s fix clock restarts at the reopen. Tickets waiting for the reporter are never overdue.</p>

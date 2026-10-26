@@ -6,6 +6,8 @@ import { cleanGitRef, cleanSiteUrl, isPortalCode, parseList, parsePrefixes, pars
 import { validateSettingsInput } from "@/lib/targets";
 import { requireUser } from "@/lib/session";
 import { userClient } from "@/lib/supabase/server";
+import { serviceClient } from "@/lib/supabase/admin";
+import { allowedDomain } from "@/lib/config";
 import { syncKnownSystems } from "@/lib/system-registry";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -138,6 +140,18 @@ export async function setUserAccess(fd: FormData) {
   if (id === user.id) done("people", "You cannot change your own access. Ask another admin.", false);
   const { error } = await supabase.from("support_users").update({ role, is_active: fd.get("active") === "on" }).eq("id", id);
   done("people", error ? "Could not save access." : "Access saved.", !error);
+}
+
+export async function inviteUser(fd: FormData) {
+  await admin();
+  const email = str(fd, "email").toLowerCase();
+  const name = str(fd, "name").slice(0, 100);
+  const domain = allowedDomain();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !domain || !email.endsWith(`@${domain}`)) done("settings", `Invite a verified ${domain || "company"} email address.`, false);
+  const service = serviceClient();
+  if (!service) done("settings", "User invitations are unavailable because the Supabase service role is not configured.", false);
+  const { error } = await service.auth.admin.inviteUserByEmail(email, { data: name ? { full_name: name } : undefined });
+  done("settings", error ? "Could not send the invitation. The user may already be registered." : `Invitation sent to ${email}. They will appear under People & access after signing in.`, !error);
 }
 
 export async function mapUnmatched(fd: FormData) {

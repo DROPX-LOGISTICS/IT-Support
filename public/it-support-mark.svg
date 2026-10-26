@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" role="img" aria-labelledby="title desc">
+  <title id="title">DropX IT Support</title>
+  <desc id="desc">A navy shield with an orange lightning mark</desc>
+  <defs>
+    <linearGradient id="shield" x1="7" y1="4" x2="34" y2="36" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#263451"/>
+      <stop offset="1" stop-color="#111a2e"/>
+    </linearGradient>
+    <linearGradient id="bolt" x1="17" y1="9" x2="25" y2="30" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffc44d"/>
+      <stop offset="1" stop-color="#e15316"/>
+    </linearGradient>
+  </defs>
+  <path d="M20 2.8 35 8.4v10.2c0 9.1-6 15.8-15 18.6C11 34.4 5 27.7 5 18.6V8.4L20 2.8Z" fill="url(#shield)"/>
+  <path d="m22.8 8.7-9.1 13.1h6.2l-2 10.1 9.1-14h-6.1l1.9-9.2Z" fill="url(#bolt)"/>
+  <path d="M20 2.8 35 8.4v10.2c0 9.1-6 15.8-15 18.6C11 34.4 5 27.7 5 18.6V8.4L20 2.8Z" fill="none" stroke="#8fa0bf" stroke-opacity=".35" stroke-width="1.2"/>
+</svg>

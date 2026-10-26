@@ -30,10 +30,10 @@ export function NotConfigured({ missing }: { missing: string[] }) {
   );
 }
 
-/** The DropX logo, the same file People and OpsPulse use. */
+/** Dedicated IT Support mark; product portals keep their own branding. */
 export function Logo() {
   // eslint-disable-next-line @next/next/no-img-element
-  return <img className="logo" src="/dropx-logo.png" alt="DropX" width={89} height={30} />;
+  return <img className="logo" src="/it-support-mark.svg" alt="DropX IT Support" width={40} height={40} />;
 }
 
 export function Avatar({ name, small, neutral }: { name: string | null | undefined; small?: boolean; neutral?: boolean }) {
