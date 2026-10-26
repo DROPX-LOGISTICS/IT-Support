@@ -49,6 +49,7 @@ export default async function BoardPage({ searchParams }: { searchParams: Record
   });
   const columns: BoardColumn[] = COLUMNS.map((c) => ({ ...c, cards: cards.filter((x) => x.status === c.status) }));
   const canMove = canChangeTicket({ id: user.id, role: user.role, isActive: true });
+  const boardOpen = cards.filter((card) => !["Closed", "Not viable"].includes(card.status)).length;
 
   return (
     <AppShell user={user} width="wide">
@@ -58,8 +59,13 @@ export default async function BoardPage({ searchParams }: { searchParams: Record
           <h1>Board</h1>
           <p className="muted">{canMove ? "Drag a card to a highlighted column, or use “Move to…”. The same rules as the ticket page apply." : "Tickets by status. Managers can look but not move."}</p>
         </div>
-        <span className="muted" role="status">{cards.length} ticket{cards.length === 1 ? "" : "s"}</span>
+        <div className="board-head-stats" role="status"><span><strong>{boardOpen}</strong> open</span><span><strong>{cards.length}</strong> shown</span></div>
       </div>
+      <section className="board-guide">
+        <span className="board-guide-mark" aria-hidden>↗</span>
+        <div><strong>Keep work moving left to right</strong><p>Open a ticket for details, or use the move menu on a card. Dragging is available for developers and admins.</p></div>
+        <span className="board-live"><i aria-hidden /> Live board</span>
+      </section>
       <FilterForm key={`${f.portal}|${f.assignee}|${f.priority}`} action="/board" className="filters" style={{ marginBottom: 16 }}>
         <div className="filter-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 240px))", alignItems: "center" }}>
           <select name="portal" defaultValue={f.portal} aria-label="Portal"><option value="">Any portal</option>{(portals ?? []).map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}</select>

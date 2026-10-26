@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlarmClock, ArrowRight, Bug, CheckCircle2, CircleDot, Flame, Inbox, Lightbulb, LifeBuoy, MessageCircleQuestion, PlusCircle, UserCheck, UserX } from "lucide-react";
+import { Activity, AlarmClock, ArrowRight, Bug, CheckCircle2, CircleDashed, CircleDot, Flame, Inbox, Lightbulb, LifeBuoy, MessageCircleQuestion, PlusCircle, UserCheck, UserX } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { TicketRows, type TicketRowData } from "@/components/ticket-row";
 import { NotConfigured } from "@/components/ui";
@@ -29,8 +29,12 @@ export default async function HomePage() {
   const staff = isStaff(user.role);
   const supabase = userClient()!;
   const now = new Date();
+  const ticketScope = () => {
+    const query = supabase.from("support_tickets").select("id", { count: "exact", head: true }).is("deleted_at", null);
+    return staff ? query : query.eq("reporter_id", user.id);
+  };
 
-  const [mine, team, devs, settings] = await Promise.all([
+  const [mine, team, devs, settings, total, inProgress, unassignedSummary, notStarted, waitingForReporter, completed] = await Promise.all([
     supabase.from("support_tickets").select(SELECT).eq("reporter_id", user.id).is("deleted_at", null).order("created_at", { ascending: false }).limit(200).returns<Row[]>(),
     staff
       ? supabase.from("support_tickets").select(SELECT).is("deleted_at", null).in("status", [...OPEN_STATUSES]).order("priority").order("created_at").limit(600).returns<Row[]>()
@@ -39,6 +43,12 @@ export default async function HomePage() {
       ? supabase.from("support_users").select("id,name").in("role", ["developer", "admin"]).eq("is_active", true).returns<{ id: string; name: string }[]>()
       : Promise.resolve({ data: [] as { id: string; name: string }[] }),
     staff ? loadSettings(supabase) : Promise.resolve(null),
+    ticketScope(),
+    ticketScope().eq("status", "In progress"),
+    ticketScope().is("assignee_id", null).in("status", [...OPEN_STATUSES]),
+    ticketScope().eq("status", "New"),
+    ticketScope().eq("status", DONE),
+    ticketScope().eq("status", "Closed"),
   ]);
   const myRows = mine.data ?? [];
   const teamRows = team.data ?? [];
@@ -63,6 +73,14 @@ export default async function HomePage() {
   const overdue = teamView.filter((t) => t.overdueHours !== null).length;
   const urgent = teamRows.filter((t) => (t.priority === "P0" || t.priority === "P1") && t.status !== DONE).length;
   const firstName = (user.name || user.email).split(/[\s@]/)[0];
+  const summaryCards = [
+    { label: "Total tickets", value: total.count ?? 0, icon: Inbox, tone: "", href: staff ? "/queue?status=all" : "/my-tickets?show=all" },
+    { label: "In progress", value: inProgress.count ?? 0, icon: Activity, tone: "brand", href: staff ? "/queue?status=In%20progress" : "/my-tickets?show=all" },
+    { label: "Not assigned", value: unassignedSummary.count ?? 0, icon: UserX, tone: "warn", href: staff ? "/queue?assignee=none" : "/my-tickets?show=all" },
+    { label: "Not started", value: notStarted.count ?? 0, icon: CircleDashed, tone: "info", href: staff ? "/queue?status=New" : "/my-tickets?show=all" },
+    { label: "Waiting for reporter", value: waitingForReporter.count ?? 0, icon: MessageCircleQuestion, tone: "violet", href: staff ? `/queue?status=${encodeURIComponent(DONE)}` : "/my-tickets?show=all" },
+    { label: "Completed", value: completed.count ?? 0, icon: CheckCircle2, tone: "good", href: staff ? "/queue?status=Closed" : "/my-tickets?show=all" },
+  ];
 
   return (
     <AppShell user={user} width="mid">
@@ -75,6 +93,17 @@ export default async function HomePage() {
           <Link className="btn lg" href="/new"><PlusCircle size={19} aria-hidden /> Raise a ticket</Link>
         </section>
         {(mine.error || team.error) && <div className="banner bad" role="alert">We could not load everything. Please refresh.</div>}
+
+        <section className="summary-cards" aria-label="Ticket summary">
+          {summaryCards.map(({ icon: Icon, ...card }) => (
+            <Link key={card.label} className={`summary-card${card.tone ? ` ${card.tone}` : ""}`} href={card.href}>
+              <span className="summary-card-icon"><Icon size={17} aria-hidden /></span>
+              <span className="summary-card-value">{card.value}</span>
+              <span className="summary-card-label">{card.label}</span>
+              <ArrowRight className="summary-card-arrow" size={15} aria-hidden />
+            </Link>
+          ))}
+        </section>
 
         {waiting.length > 0 && (
           <section className="card confirm-card">
