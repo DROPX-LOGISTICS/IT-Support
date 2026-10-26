@@ -1,11 +1,10 @@
 "use server";
-import { randomUUID } from "node:crypto";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { MAX_FILES, sniffMime, storagePath, validateFiles } from "@/lib/attachments";
+import { MAX_FILES, sniffMime, validateFiles } from "@/lib/attachments";
+import { deleteDriveAttachment, uploadDriveAttachment } from "@/lib/google-drive";
 import { notifyRaised } from "@/lib/notifications";
 import { requireUser } from "@/lib/session";
-import { serviceClient } from "@/lib/supabase/admin";
 import { userClient } from "@/lib/supabase/server";
 import { validateTicketInput, type FieldErrors } from "@/lib/validation";
 
@@ -14,6 +13,7 @@ export type RaiseState = { ok: boolean; message: string; errors?: FieldErrors };
 export async function raiseTicket(_prev: RaiseState, formData: FormData): Promise<RaiseState> {
   const session = await requireUser();
   if (session.state !== "ok") return { ok: false, message: "This site is not configured yet." };
+  if (session.user.isPreview) return { ok: false, message: "Preview mode is read-only. Exit preview to raise a ticket." };
   const supabase = userClient();
   if (!supabase) return { ok: false, message: "This site is not configured yet." };
 
@@ -46,25 +46,19 @@ export async function raiseTicket(_prev: RaiseState, formData: FormData): Promis
 
   let filesFailed = false;
   if (files.length) {
-    // Service role use #2: storage upload only, after the ticket was created for this very person.
-    const admin = serviceClient();
-    if (!admin) filesFailed = true;
-    else {
-      for (const file of files.slice(0, MAX_FILES)) {
-        try {
-          const bytes = new Uint8Array(await file.arrayBuffer());
-          const mime = sniffMime(bytes);
-          if (!mime) { filesFailed = true; continue; }
-          const path = storagePath(created.id, randomUUID(), file.name);
-          const up = await admin.storage.from("support_attachments").upload(path, bytes, { contentType: mime, upsert: false });
-          if (up.error) { filesFailed = true; continue; }
-          const rec = await supabase.rpc("support_add_attachment", {
-            p_ticket: created.id, p_path: path, p_name: file.name.slice(0, 200), p_mime: mime, p_size: bytes.byteLength,
-          });
-          if (rec.error) { filesFailed = true; await admin.storage.from("support_attachments").remove([path]); }
-        } catch {
-          filesFailed = true;
-        }
+    // New files are stored in the configured Google Drive folder after the ticket is created.
+    for (const file of files.slice(0, MAX_FILES)) {
+      try {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        const mime = sniffMime(bytes);
+        if (!mime) { filesFailed = true; continue; }
+        const driveFile = await uploadDriveAttachment({ ticketNumber: created.number, name: file.name, mime, bytes });
+        const rec = await supabase.rpc("support_add_attachment", {
+          p_ticket: created.id, p_path: `drive:${driveFile.id}`, p_name: file.name.slice(0, 200), p_mime: mime, p_size: bytes.byteLength,
+        });
+        if (rec.error) { filesFailed = true; await deleteDriveAttachment(driveFile.id).catch(() => false); }
+      } catch {
+        filesFailed = true;
       }
     }
   }

@@ -20,7 +20,7 @@ export function ViewAsUserButton({ users }: { users: ViewUser[] }) {
           <label className="view-as-search"><Search size={18} aria-hidden /><input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Name, email or role" /></label>
           <p className="view-as-safe"><ShieldCheck size={15} aria-hidden /> Read-only. No ticket, approval, or account changes.</p>
           <div className="view-as-results">
-            {query.trim().length < 2 ? <p className="view-as-empty">Type at least 2 characters to find a profile.</p> : filtered.length === 0 ? <p className="view-as-empty">No matching users.</p> : filtered.map((u) => <Link key={u.id} href={`/admin/view-as?user=${u.id}`} onClick={() => setOpen(false)} className="view-as-result"><span className="avatar">{(u.name || u.email).slice(0, 1).toUpperCase()}</span><span><strong>{u.name || u.email}</strong><small>{u.email} · {u.role}{!u.is_active && " · inactive"}</small></span></Link>)}
+            {query.trim().length < 2 ? <p className="view-as-empty">Type at least 2 characters to find a profile.</p> : filtered.length === 0 ? <p className="view-as-empty">No matching users.</p> : filtered.map((u) => <Link key={u.id} href={`/api/admin/view-as?user=${encodeURIComponent(u.id)}`} onClick={() => setOpen(false)} className="view-as-result"><span className="avatar">{(u.name || u.email).slice(0, 1).toUpperCase()}</span><span><strong>{u.name || u.email}</strong><small>{u.email} · {u.role}{!u.is_active && " · inactive"}</small></span></Link>)}
           </div>
           <p className="view-as-foot">Choose the exact profile when someone has more than one role.</p>
         </section>

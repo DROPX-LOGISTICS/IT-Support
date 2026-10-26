@@ -14,6 +14,7 @@ import { loadSettings } from "@/lib/targets-server";
 import { appUrl } from "@/lib/config";
 import { integrationSummaries } from "@/lib/integrations";
 import { oauthCallback } from "@/lib/oauth";
+import { ATTACHMENTS_FOLDER_URL } from "@/lib/google-drive";
 import { PRIORITIES, PRIORITY_LABEL } from "@/lib/tickets";
 import { updateSettings, addDeveloper, addPortal, addRepo, deleteRepo, dismissUnmatched, inviteUser, mapUnmatched, seedKnownSystems, setUserAccess, updateDeveloper, updatePortal, updateRepo } from "./actions";
 import {
@@ -235,6 +236,10 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
               <div className="integration-hero-icon"><Plug size={20} aria-hidden /></div>
               <div><strong>Connect once. Use everywhere.</strong><p>Tokens are encrypted before they are stored in Cloudflare KV. Values are never sent to the browser again.</p></div>
               <span className={`system-status ${integrations.google.storageReady ? "live" : "off"}`}>{integrations.google.storageReady ? "Secure storage ready" : "Storage unavailable"}</span>
+            </section>
+            <section className="card attachment-storage-card">
+              <div><strong>Ticket attachments</strong><p className="muted">New screenshots and PDFs are compressed where possible and stored in the shared Google Drive folder. Existing Supabase attachments remain readable.</p></div>
+              <a className="btn ghost sm" href={ATTACHMENTS_FOLDER_URL} target="_blank" rel="noreferrer">Open attachment folder <ExternalLink size={13} /></a>
             </section>
 
             <div className="integration-grid">

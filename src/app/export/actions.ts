@@ -16,6 +16,7 @@ export async function exportToSheets(_p: SheetResult, fd: FormData): Promise<She
   const s = await requireUser();
   const supabase = userClient();
   if (s.state !== "ok" || !supabase) return { ok: false, message: "Not configured." };
+  if (s.user.isPreview) return { ok: false, message: "Preview mode is read-only. Exit preview before exporting." };
   if (!isStaff(s.user.role)) return { ok: false, message: "You are not allowed to export." };
   const status = await sheetsRuntimeStatus();
   if (!status.configured) return { ok: false, message: "Google Sheets export is not set up yet. Download the CSV instead." };

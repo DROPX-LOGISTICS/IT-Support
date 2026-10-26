@@ -12,7 +12,7 @@ import { loadSettings } from "@/lib/targets-server";
 import { overdueInfo } from "@/lib/targets";
 import { DetailsForm, StatusForm } from "@/components/staff-controls";
 import { Avatar, NotConfigured, OverdueBadge, PriorityPill, StatusBadge, StatusSteps } from "@/components/ui";
-import { canChangeTicket, isStaff } from "@/lib/access";
+import { canChangeTicket, canViewTicket, isStaff } from "@/lib/access";
 import { fmtDate, fmtDateTime } from "@/lib/format";
 import { buildCalendarUrl } from "@/lib/calendar-link";
 import { appUrl } from "@/lib/config";
@@ -47,10 +47,10 @@ export default async function TicketPage({ params }: { params: { id: string } })
     .select("*, portal:support_portals(name)")
     .eq("id", params.id)
     .maybeSingle<Ticket>();
-  if (!t) notFound();
+  if (!t || !canViewTicket({ id: user.id, role: user.role, isActive: true }, { reporterId: t.reporter_id, deletedAt: null })) notFound();
 
   const staff = isStaff(user.role);
-  const canChange = canChangeTicket({ id: user.id, role: user.role, isActive: true });
+  const canChange = !user.isPreview && canChangeTicket({ id: user.id, role: user.role, isActive: true });
   const [comments, events, files, devs] = await Promise.all([
     supabase.from("support_comments").select("id,author_name,body,internal,created_at").eq("ticket_id", t.id).order("created_at").returns<{ id: string; author_name: string; body: string; internal: boolean; created_at: string }[]>(),
     supabase.from("support_events").select("id,event_type,actor_name,old_value,new_value,reason,created_at").eq("ticket_id", t.id).order("created_at").returns<{ id: string; event_type: string; actor_name: string; old_value: string | null; new_value: string | null; reason: string | null; created_at: string }[]>(),
@@ -92,8 +92,8 @@ export default async function TicketPage({ params }: { params: { id: string } })
 
         <div className="t-layout">
           <div className="stack" style={{ minWidth: 0 }}>
-            {awaiting && isReporter && <section className="card confirm-card"><ConfirmBar ticketId={t.id} /></section>}
-            {awaiting && !isReporter && canChange && <section className="card confirm-card"><ConfirmBar ticketId={t.id} onBehalf /></section>}
+            {!user.isPreview && awaiting && isReporter && <section className="card confirm-card"><ConfirmBar ticketId={t.id} /></section>}
+            {!user.isPreview && awaiting && !isReporter && canChange && <section className="card confirm-card"><ConfirmBar ticketId={t.id} onBehalf /></section>}
 
             {t.meet_link && t.status !== "Closed" && (
               <section className="card">
@@ -149,7 +149,7 @@ export default async function TicketPage({ params }: { params: { id: string } })
                   </div>
                 </div>
               ))}
-              {t.status === "Closed" ? <p className="muted" style={{ marginBottom: 0 }}>This ticket is closed, so comments are off.</p> : <CommentForm ticketId={t.id} staff={staff} />}
+              {user.isPreview ? <p className="muted" style={{ marginBottom: 0 }}>Preview mode is read-only. Comments are disabled.</p> : t.status === "Closed" ? <p className="muted" style={{ marginBottom: 0 }}>This ticket is closed, so comments are off.</p> : <CommentForm ticketId={t.id} staff={staff} />}
             </section>
 
             <section className="card">

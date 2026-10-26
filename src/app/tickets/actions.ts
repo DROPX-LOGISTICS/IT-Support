@@ -49,7 +49,7 @@ function refresh(id: string) {
 async function context() {
   const session = await requireUser();
   const supabase = userClient();
-  if (session.state !== "ok" || !supabase) return null;
+  if (session.state !== "ok" || !supabase || session.user.isPreview) return null;
   return { user: session.user, supabase };
 }
 const isDev = (c: NonNullable<Awaited<ReturnType<typeof context>>>) => canChangeTicket({ id: c.user.id, role: c.user.role, isActive: true });

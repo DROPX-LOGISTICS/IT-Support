@@ -6,6 +6,7 @@ import { testGeminiConnection } from "@/lib/gemini";
 import { classifyGeminiFailure, geminiFailureMessage } from "@/lib/gemini-errors";
 import { GoogleApiError } from "@/lib/google-calendar";
 import { SHEETS_SCOPES, sheetsErrorMessage, sheetsRuntimeStatus } from "@/lib/google-sheets";
+import { GOOGLE_SCOPES } from "@/lib/oauth";
 import {
   disconnectGeminiIntegration, disconnectIntegration, noteGeminiCheck, noteIntegrationCheck,
   runtimeGithubToken, runtimeGoogleAccessToken, saveGeminiIntegration, saveOAuthApp, type IntegrationProvider,
@@ -24,7 +25,7 @@ function githubErrorMessage(error: unknown): string {
 }
 async function admin() {
   const session = await requireUser();
-  if (session.state !== "ok" || !canManageMaster({ id: session.user.id, role: session.user.role, isActive: true })) redirect("/my-tickets");
+  if (session.state !== "ok" || session.user.isPreview || !canManageMaster({ id: session.user.id, role: session.user.role, isActive: true })) redirect("/my-tickets");
 }
 function done(ok: boolean, message: string): never {
   revalidatePath("/master");
@@ -65,7 +66,8 @@ export async function testIntegrationAction(fd: FormData) {
       if (!tokenInfo.ok) throw new GoogleApiError(`Google token validation returned ${tokenInfo.status}`, tokenInfo.status);
       const tokenData = await tokenInfo.json().catch(() => ({})) as { scope?: string; email?: string };
       const granted = new Set(String(tokenData.scope ?? "").split(/[ ,]+/).filter(Boolean));
-      const missingScopes = SHEETS_SCOPES.filter((scope) => !granted.has(scope));
+      const requiredGoogleScopes = GOOGLE_SCOPES.filter((scope) => scope.startsWith("https://www.googleapis.com/auth/"));
+      const missingScopes = requiredGoogleScopes.filter((scope) => !granted.has(scope));
       if (missingScopes.length) throw new GoogleApiError("OAuth token has insufficient authentication scopes", 403);
       const res = await fetch("https://www.googleapis.com/drive/v3/files?pageSize=1&spaces=drive&fields=files(id)", {
         headers: { authorization: `Bearer ${token}`, accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(12_000),
@@ -73,6 +75,13 @@ export async function testIntegrationAction(fd: FormData) {
       if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { error?: { message?: string } };
         throw new GoogleApiError(body.error?.message ?? `Google returned ${res.status}`, res.status);
+      }
+      const gmail = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
+        headers: { authorization: `Bearer ${token}`, accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(12_000),
+      });
+      if (!gmail.ok) {
+        const body = await gmail.json().catch(() => ({})) as { error?: { message?: string } };
+        throw new GoogleApiError(body.error?.message ?? `Gmail returned ${gmail.status}`, gmail.status);
       }
     } else {
       const token = await runtimeGithubToken();

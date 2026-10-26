@@ -59,7 +59,7 @@ export async function notify(ticketId: string, kind: MailKind, opts: NotifyOpts 
     };
     const { subject, content } = buildEmail(kind, mt, `${appUrl()}/tickets/${t.id}`, opts.extra);
     const res = await sendMail(to, subject, content);
-    await record(db, t.id, kind, res.ok, res.ok ? undefined : res.reason === "not_configured" ? "email is not configured" : "send failed");
+    await record(db, t.id, kind, res.ok, res.ok ? undefined : res.reason === "not_configured" ? res.detail ?? "email is not configured" : res.detail ?? "send failed");
     return res.ok;
   } catch {
     return false;

@@ -17,7 +17,7 @@ const str = (fd: FormData, k: string) => String(fd.get(k) ?? "").trim();
 async function admin() {
   const s = await requireUser();
   const supabase = userClient();
-  if (s.state !== "ok" || !supabase || !canManageMaster({ id: s.user.id, role: s.user.role, isActive: true })) redirect("/my-tickets");
+  if (s.state !== "ok" || !supabase || s.user.isPreview || !canManageMaster({ id: s.user.id, role: s.user.role, isActive: true })) redirect("/my-tickets");
   return { supabase, user: s.user };
 }
 function done(tab: string, msg: string, ok = true): never {

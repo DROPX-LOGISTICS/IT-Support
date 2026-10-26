@@ -36,6 +36,7 @@ export function TicketForm(props: { portals: { code: string; name: string }[]; d
   const [title, setTitle] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [over, setOver] = useState(false);
+  const [compressing, setCompressing] = useState(false);
   const [skipped, setSkipped] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
   const banner = useRef<HTMLDivElement>(null);
@@ -53,15 +54,34 @@ export function TicketForm(props: { portals: { code: string; name: string }[]; d
     next.forEach((f) => dt.items.add(f));
     if (fileInput.current) fileInput.current.files = dt.files;
   }
-  function addFiles(list: FileList | File[] | null) {
+  async function compressImage(file: File): Promise<File> {
+    if (!file.type.startsWith("image/") || file.size < 350 * 1024 || typeof createImageBitmap !== "function") return file;
+    try {
+      const image = await createImageBitmap(file);
+      const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(image.width * scale));
+      canvas.height = Math.max(1, Math.round(image.height * scale));
+      canvas.getContext("2d")?.drawImage(image, 0, 0, canvas.width, canvas.height);
+      image.close();
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.82));
+      if (!blob || blob.size >= file.size) return file;
+      const base = file.name.replace(/\.[^.]+$/, "") || "attachment";
+      return new File([blob], `${base}.jpg`, { type: "image/jpeg", lastModified: file.lastModified });
+    } catch { return file; }
+  }
+  async function addFiles(list: FileList | File[] | null) {
     if (!list) return;
     const incoming = Array.from(list);
     const good = incoming.filter((f) => ACCEPT.includes(f.type));
-    const next = [...files, ...good].slice(0, MAX_FILES);
+    setCompressing(true);
+    const compressed = await Promise.all(good.map(compressImage));
+    const next = [...files, ...compressed].slice(0, MAX_FILES);
     const dropped = incoming.length - good.length;
-    const extra = files.length + good.length - next.length;
+    const extra = files.length + compressed.length - next.length;
     setSkipped([dropped ? `${dropped} file${dropped === 1 ? " is" : "s are"} not a picture or PDF` : "", extra > 0 ? `only ${MAX_FILES} files fit` : ""].filter(Boolean).join("; "));
     syncFiles(next);
+    setCompressing(false);
   }
   const tooBig = files.find((f) => f.size > MAX_BYTES);
   const fileProblem = tooBig
@@ -135,10 +155,10 @@ export function TicketForm(props: { portals: { code: string; name: string }[]; d
         <div className="section-title"><span className="step">4</span> Screenshots <span className="hint">(optional)</span></div>
         <label className={`drop${over ? " over" : ""}`}
           onDragOver={(ev) => { ev.preventDefault(); setOver(true); }} onDragLeave={() => setOver(false)}
-          onDrop={(ev) => { ev.preventDefault(); setOver(false); addFiles(ev.dataTransfer.files); }}>
+          onDrop={(ev) => { ev.preventDefault(); setOver(false); void addFiles(ev.dataTransfer.files); }}>
           <ImagePlus size={22} aria-hidden style={{ verticalAlign: "-5px" }} /> <strong>Drop screenshots here</strong>, paste one, or choose files
-          <div className="hint">Pictures or a PDF. Up to {MAX_FILES} files, {MAX_MB} MB in total.</div>
-          <input ref={fileInput} type="file" name="files" multiple accept={ACCEPT.join(",")} onChange={(ev) => addFiles(ev.target.files)} />
+          <div className="hint">Pictures are compressed before upload. PDFs stay unchanged. Up to {MAX_FILES} files, {MAX_MB} MB in total.</div>
+          <input ref={fileInput} type="file" name="files" multiple accept={ACCEPT.join(",")} onChange={(ev) => { void addFiles(ev.target.files); }} />
         </label>
         {files.length > 0 && (
           <ul className="files">
@@ -153,6 +173,7 @@ export function TicketForm(props: { portals: { code: string; name: string }[]; d
             ))}
           </ul>
         )}
+        {compressing && <div className="hint" role="status" style={{ marginTop: 6 }}>Compressing images…</div>}
         {skipped && <div className="hint" role="status" style={{ marginTop: 6 }}>Not added: {skipped}.</div>}
         {(e.files || fileProblem) && <div className="err" role="alert">{fileProblem || e.files}</div>}
       </section>
@@ -174,7 +195,7 @@ export function TicketForm(props: { portals: { code: string; name: string }[]; d
         <p className="hint" style={{ margin: "10px 0 0" }}>Using a shared station mailbox? Enter your own name so we know who to speak to.</p>
       </section>
 
-      <div className="actions sticky-actions"><span className="hint">You can follow it under My tickets.</span><Submit blocked={Boolean(fileProblem)} /></div>
+      <div className="actions sticky-actions"><span className="hint">You can follow it under My tickets.</span><Submit blocked={Boolean(fileProblem || compressing)} /></div>
     </form>
   );
 }

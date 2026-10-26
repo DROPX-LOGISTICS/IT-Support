@@ -6,7 +6,9 @@ export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
   "https://www.googleapis.com/auth/calendar.events",
   "https://www.googleapis.com/auth/spreadsheets",
-  "https://www.googleapis.com/auth/drive.file",
+  // Full Drive scope is required because the attachment folder already exists
+  // outside this OAuth app. drive.file cannot reliably write into that folder.
+  "https://www.googleapis.com/auth/drive",
 ];
 export const GITHUB_SCOPES = ["repo", "read:user", "user:email"];
 export const oauthCallback = (provider: IntegrationProvider, origin?: string) => `${appUrl(origin)}/api/integrations/${provider}/callback`;
