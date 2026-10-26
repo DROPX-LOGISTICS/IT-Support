@@ -32,7 +32,7 @@ export function CommentForm({ ticketId, staff }: { ticketId: string; staff: bool
       <input type="hidden" name="mode" value="comment" />
       <textarea name="body" value={body} onChange={(e) => setBody(e.target.value)} maxLength={5000} placeholder="Write a comment…" aria-label="Comment" style={{ minHeight: 80 }} />
       <div className="ai-compose">
-        <label className="sr-only" htmlFor={`comment-ai-instruction-${ticketId}`}>Describe what the AI should write</label>
+        <label className="ai-prompt-label" htmlFor={`comment-ai-instruction-${ticketId}`}><Sparkles size={13} aria-hidden /> Describe your message <span>(optional)</span></label>
         <input id={`comment-ai-instruction-${ticketId}`} name="aiInstruction" className="ai-prompt" maxLength={1200} placeholder="Describe your message… e.g. ask the reporter to confirm the result" />
         <span className="ai-hint">AI uses the ticket details and your instruction. Review before posting.</span>
       </div>

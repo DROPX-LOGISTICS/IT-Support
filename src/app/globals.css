@@ -677,7 +677,9 @@ details.fold[open] > summary { margin-bottom: 14px; }
 .summary-card.info .summary-card-icon { color: #2563eb; background: #eff6ff; border-color: transparent; }
 .summary-card.violet .summary-card-icon { color: #7c3aed; background: #f5f3ff; border-color: transparent; }
 .summary-card.good .summary-card-icon { color: var(--ok); background: var(--ok-soft); border-color: transparent; }
-.ai-compose { display: grid; gap: 6px; margin-top: 8px; padding: 8px; border: 1px solid color-mix(in srgb, #7c3aed 18%, var(--line)); border-radius: 11px; background: color-mix(in srgb, #f5f3ff 48%, var(--surface)); }
+.ai-compose { display: grid; gap: 6px; margin-top: 8px; padding: 9px; border: 1px solid color-mix(in srgb, #7c3aed 28%, var(--line)); border-radius: 11px; background: color-mix(in srgb, #f5f3ff 48%, var(--surface)); }
+.ai-prompt-label { display: inline-flex; align-items: center; gap: 5px; color: #6d28d9; font-size: 12px; font-weight: 750; }
+.ai-prompt-label span { color: var(--muted); font-weight: 500; }
 .ai-prompt { width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; font-size: 13px; }
 .ai-prompt:focus { outline: 2px solid color-mix(in srgb, #7c3aed 30%, transparent); border-color: #7c3aed; }
 .ai-hint { color: var(--muted); font-size: 11px; line-height: 1.3; }

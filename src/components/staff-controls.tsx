@@ -48,7 +48,7 @@ export function StatusForm(props: { ticketId: string; status: Status; options: S
           <label className="field" htmlFor="update">Update for the reporter <span className="hint">(plain words, no technical terms)</span></label>
           <textarea id="update" name="update" value={update} onChange={(event) => setUpdate(event.target.value)} style={{ minHeight: 80 }} placeholder="What was fixed or delivered, and what they should check." />
           <div className="ai-compose">
-            <label className="sr-only" htmlFor={`status-ai-instruction-${props.ticketId}`}>Describe what the AI should write</label>
+            <label className="ai-prompt-label" htmlFor={`status-ai-instruction-${props.ticketId}`}><Sparkles size={13} aria-hidden /> Describe your message <span>(optional)</span></label>
             <input id={`status-ai-instruction-${props.ticketId}`} name="aiInstruction" className="ai-prompt" maxLength={1200} placeholder="Describe your message… e.g. explain the fix and what the reporter should check" />
             <span className="ai-hint">AI uses the ticket details and your instruction. Review before changing status.</span>
             <DraftButton action={aiAction} />
@@ -122,7 +122,7 @@ export function DetailsForm(props: {
         <label className="field" htmlFor="developerUpdate">Update for the reporter <span className="hint">(shown on their ticket)</span></label>
         <textarea id="developerUpdate" name="developerUpdate" value={developerUpdate} onChange={(event) => setDeveloperUpdate(event.target.value)} maxLength={2000} style={{ minHeight: 80 }} />
         <div className="ai-compose">
-          <label className="sr-only" htmlFor={`details-ai-instruction-${props.ticketId}`}>Describe what the AI should write</label>
+          <label className="ai-prompt-label" htmlFor={`details-ai-instruction-${props.ticketId}`}><Sparkles size={13} aria-hidden /> Describe your message <span>(optional)</span></label>
           <input id={`details-ai-instruction-${props.ticketId}`} name="aiInstruction" className="ai-prompt" maxLength={1200} placeholder="Describe your message… e.g. summarize the delivered fix in plain words" />
           <span className="ai-hint">AI uses the ticket details, links, and your instruction. Review before saving.</span>
           <DraftButton action={aiAction} />
