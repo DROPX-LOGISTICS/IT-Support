@@ -45,7 +45,7 @@ export function StatusForm(props: { ticketId: string; status: Status; options: S
       )}
       {to === DONE && (
         <div>
-          <label className="field" htmlFor="update">Update for the reporter <span className="hint">(plain words, no technical terms)</span></label>
+          <label className="field" htmlFor="update">Draft result / update for the reporter <span className="hint">(plain words, no technical terms)</span></label>
           <textarea id="update" name="update" value={update} onChange={(event) => setUpdate(event.target.value)} style={{ minHeight: 80 }} placeholder="What was fixed or delivered, and what they should check." />
           <div className="ai-compose">
             <label className="ai-prompt-label" htmlFor={`status-ai-instruction-${props.ticketId}`}><Sparkles size={13} aria-hidden /> Describe your message <span>(optional)</span></label>
@@ -119,7 +119,7 @@ export function DetailsForm(props: {
         </div>
       )}
       <div>
-        <label className="field" htmlFor="developerUpdate">Update for the reporter <span className="hint">(shown on their ticket)</span></label>
+        <label className="field" htmlFor="developerUpdate">Draft result / update for the reporter <span className="hint">(shown on their ticket)</span></label>
         <textarea id="developerUpdate" name="developerUpdate" value={developerUpdate} onChange={(event) => setDeveloperUpdate(event.target.value)} maxLength={2000} style={{ minHeight: 80 }} />
         <div className="ai-compose">
           <label className="ai-prompt-label" htmlFor={`details-ai-instruction-${props.ticketId}`}><Sparkles size={13} aria-hidden /> Describe your message <span>(optional)</span></label>

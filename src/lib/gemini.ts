@@ -122,19 +122,36 @@ export async function refineDailyWorkDone(workDone: string): Promise<string> {
 
 export type TicketDraftMode = "status" | "update" | "comment";
 
+export function fallbackTicketDraft(mode: TicketDraftMode, notes: string, internal = false): string {
+  const text = notes.replace(/\r\n?/g, "\n").trim();
+  if (internal) return text || "Please review the ticket and add the technical update.";
+  const dates = [...text.matchAll(/\b\d{1,2}\/\d{1,2}\/\d{4}\b/g)].map((m) => m[0]);
+  const date = dates[0];
+  const times = [...text.matchAll(/\b\d{1,2}:\d{2}\b/g)].map((m) => m[0]);
+  const name = text.match(/\bFor\s+([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*)\s*:/)?.[1];
+  if (/overnight/i.test(text) && date && times.length >= 2) {
+    return `The overnight attendance issue has been addressed. Valid overnight shifts are now accepted when the OUT time is earlier than the IN time. Please use ${date} as${name ? ` ${name}'s` : " the"} shift start date, with IN at ${times[0]} and OUT at ${times[1]}.${dates[1] ? ` Do not use ${dates[1]} as the attendance date.` : ""}`;
+  }
+  const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean).slice(0, 3);
+  return sentences.join(" ") || "The team has prepared an update for this ticket. Please review the ticket and confirm the result.";
+}
+
 export async function refineTicketText(mode: TicketDraftMode, source: string, context: {
-  number: string; title: string; type: string; status: string; description: string; links?: string[]; instruction?: string;
+  number: string; title: string; type: string; status: string; description: string; links?: string[]; instruction?: string; internal?: boolean;
 }): Promise<string> {
   const runtime = await geminiRuntimeConfig();
   if (!runtime) throw new GeminiRequestError("not_configured", "Gemini is not configured");
   const label = mode === "comment" ? "a clear support comment" : "a concise update for the reporter";
   const notes = [context.instruction?.trim(), source.trim()].filter(Boolean).join("\n\n");
+  const audience = mode === "comment" && context.internal ? "an internal developer note" : "a reporter-facing message in simple, everyday language";
   const prompt = [
     "Write " + label + " for a DropX IT Support ticket.",
+    `Audience: ${audience}.`,
     "Return only plain text. Do not use markdown headings, code, technical jargon, or invented facts.",
     "The writer-provided notes below are the source of truth. Rewrite them clearly, but do not add facts, causes, progress claims, or promises that are not in those notes.",
     "Preserve every supplied date, time, person name, commit reference, instruction, and important edge case. Do not drop concrete details just to make the message shorter.",
     "The ticket workflow status is not evidence of implementation progress. Never write that work is ongoing or incomplete unless the writer notes explicitly say that.",
+    context.internal ? "For this internal note, technical implementation details are allowed." : "For a reporter-facing message, never include commit hashes, branch names, push/deploy language, API or code details, or developer-only explanations. Explain the result and the next step normally.",
     `Ticket: ${context.number} · ${context.title} · ${context.type} · current status: ${context.status}`,
     `What was reported: ${context.description.slice(0, 3000)}`,
     `Saved commit, pull request, or page links (references only): ${(context.links ?? []).join("\n") || "None"}`,

@@ -30,7 +30,8 @@ export function CommentForm({ ticketId, staff }: { ticketId: string; staff: bool
     <form ref={ref} action={action} style={{ marginTop: 14 }}>
       <input type="hidden" name="ticketId" value={ticketId} />
       <input type="hidden" name="mode" value="comment" />
-      <textarea name="body" value={body} onChange={(e) => setBody(e.target.value)} maxLength={5000} placeholder="Write a comment…" aria-label="Comment" style={{ minHeight: 80 }} />
+      <label className="field" htmlFor={`comment-body-${ticketId}`}>Draft result / comment</label>
+      <textarea id={`comment-body-${ticketId}`} name="body" value={body} onChange={(e) => setBody(e.target.value)} maxLength={5000} placeholder="Write a comment…" aria-label="Comment" style={{ minHeight: 80 }} />
       <div className="ai-compose">
         <label className="ai-prompt-label" htmlFor={`comment-ai-instruction-${ticketId}`}><Sparkles size={13} aria-hidden /> Describe your message <span>(optional)</span></label>
         <input id={`comment-ai-instruction-${ticketId}`} name="aiInstruction" className="ai-prompt" maxLength={1200} placeholder="Describe your message… e.g. ask the reporter to confirm the result" />
