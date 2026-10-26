@@ -9,7 +9,7 @@ type Db = SupabaseClient;
 type Row = {
   id: string; number: string; title: string; type: string; priority: string; status: string; developer_update: string | null;
   viable_reason: string | null; expected_date: string | null; meet_link: string | null; meet_at: string | null;
-  reporter_id: string | null; reporter_name: string; reporter_email: string; assignee_id: string | null; portal: { name: string } | null;
+  reporter_id: string | null; reporter_name: string; reporter_email: string; assignee_id: string | null; email_thread_id?: string | null; email_message_id?: string | null; portal: { name: string } | null;
 };
 
 // Which switch in Master, Settings turns each email on or off.
@@ -25,10 +25,17 @@ async function staffEmails(db: Db, roles: string[]) {
   return (data ?? []).map((r: { email: string }) => r.email);
 }
 
-async function record(db: Db, ticketId: string, kind: MailKind, ok: boolean, why?: string) {
+type ThreadMeta = { threadId: string; messageId: string };
+const encodeThread = (thread: ThreadMeta) => `gmail_thread:${thread.threadId}|${thread.messageId}`;
+const decodeThread = (value: string | null | undefined): ThreadMeta | null => {
+  const match = /^gmail_thread:([^|]+)\|(.+)$/.exec(value ?? "");
+  return match ? { threadId: match[1], messageId: match[2] } : null;
+};
+
+async function record(db: Db, ticketId: string, kind: MailKind, ok: boolean, why?: string, thread?: ThreadMeta) {
   // Failed or skipped sends are recorded so they can be retried from the ticket history; they never block the action.
   await db.from("support_events").insert({
-    ticket_id: ticketId, actor_name: "System", event_type: ok ? "email_sent" : "email_failed", new_value: kind, reason: ok ? null : why ?? "send failed",
+    ticket_id: ticketId, actor_name: "System", event_type: ok ? "email_sent" : "email_failed", new_value: kind, reason: ok ? (thread ? encodeThread(thread) : null) : why ?? "send failed",
   });
 }
 
@@ -58,8 +65,10 @@ export async function notify(ticketId: string, kind: MailKind, opts: NotifyOpts 
       developerUpdate: t.developer_update, viableReason: t.viable_reason, expectedDate: t.expected_date, meetLink: t.meet_link, meetAt: t.meet_at, status: t.status,
     };
     const { subject, content } = buildEmail(kind, mt, `${appUrl()}/tickets/${t.id}`, opts.extra);
-    const res = await sendMail(to, subject, content);
-    await record(db, t.id, kind, res.ok, res.ok ? undefined : res.reason === "not_configured" ? res.detail ?? "email is not configured" : res.detail ?? "send failed");
+    const { data: previousEmail } = await db.from("support_events").select("reason").eq("ticket_id", t.id).eq("event_type", "email_sent").order("created_at", { ascending: false }).limit(1).maybeSingle<{ reason: string | null }>();
+    const previousThread = decodeThread(t.email_thread_id && t.email_message_id ? encodeThread({ threadId: t.email_thread_id, messageId: t.email_message_id }) : previousEmail?.reason);
+    const res = await sendMail(to, subject, content, previousThread ?? {});
+    await record(db, t.id, kind, res.ok, res.ok ? undefined : res.reason === "not_configured" ? res.detail ?? "email is not configured" : res.detail ?? "send failed", res.ok ? res : undefined);
     return res.ok;
   } catch {
     return false;

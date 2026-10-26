@@ -34,7 +34,7 @@ function encodeWord(text: string): string {
 
 const wrap76 = (b64: string) => b64.replace(/(.{76})/g, "$1\r\n");
 
-export type MailInput = { from: string; to: string[]; subject: string; text: string; html: string };
+export type MailInput = { from: string; to: string[]; subject: string; text: string; html: string; messageId?: string; inReplyTo?: string; references?: string };
 
 /** Multipart text + HTML message, returned base64url-encoded for the Gmail API. */
 export function buildRawMessage(input: MailInput, boundary = `b_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`): string {
@@ -46,6 +46,9 @@ export function buildRawMessage(input: MailInput, boundary = `b_${Math.random().
     `From: ${from.header}`,
     `To: ${to.join(", ")}`,
     `Subject: ${encodeWord(input.subject)}`,
+    ...(input.messageId ? [`Message-ID: ${input.messageId}`] : []),
+    ...(input.inReplyTo ? [`In-Reply-To: ${input.inReplyTo}`] : []),
+    ...(input.references ? [`References: ${input.references}`] : []),
     "MIME-Version: 1.0",
     `Content-Type: multipart/alternative; boundary="${boundary}"`,
     "",

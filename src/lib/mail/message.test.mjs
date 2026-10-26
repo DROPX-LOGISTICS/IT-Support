@@ -33,6 +33,17 @@ test("builds multipart text + HTML with base64url output", () => {
   assert.equal(part(mime, "text/plain"), "plain body");
   assert.equal(part(mime, "text/html"), "<p>html body</p>");
 });
+
+test("adds reply headers for a Gmail thread", () => {
+  const mime = decode(buildRawMessage({
+    from: "tech@dropxlogistics.com", to: ["a@x.com"], subject: "[BUG-001] Update",
+    text: "reply", html: "<p>reply</p>", messageId: "<new@dropxlogistics.com>",
+    inReplyTo: "<old@dropxlogistics.com>", references: "<old@dropxlogistics.com>",
+  }, "b_thread"));
+  assert.match(mime, /Message-ID: <new@dropxlogistics\.com>/);
+  assert.match(mime, /In-Reply-To: <old@dropxlogistics\.com>/);
+  assert.match(mime, /References: <old@dropxlogistics\.com>/);
+});
 test("header injection through subject or recipient is neutralised", () => {
   const mime = decode(buildRawMessage({ from: "tech@dropxlogistics.com", to: ["a@x.com", "b@x.com\r\nBcc: evil@x.com"], subject: "Hi\r\nBcc: evil@x.com", text: "t", html: "h" }, "b_t"));
   assert.ok(!/^Bcc:/m.test(mime));
