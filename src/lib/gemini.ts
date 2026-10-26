@@ -13,13 +13,9 @@ const retryable = (status: number) => status === 408 || status === 429 || status
 const wait = (milliseconds: number) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
 function generationConfig(model: string, maxOutputTokens: number) {
-  // Gemini 2.5+ supports the low thinking level. It is sufficient for formatting and avoids
-  // spending a small output allowance entirely on reasoning before returning visible text.
-  const supportsThinkingLevel = /^gemini-(?:2\.5|[3-9](?:[.-]|$))/i.test(model);
-  return {
-    maxOutputTokens,
-    ...(supportsThinkingLevel ? { thinkingConfig: { thinkingLevel: "low" } } : {}),
-  };
+  // These are short formatting requests. Leaving thinking disabled keeps the
+  // response fast and avoids sending a model-specific option to Flash variants.
+  return { maxOutputTokens, temperature: 0.2 };
 }
 
 async function responseError(response: Response): Promise<GeminiRequestError> {
@@ -72,18 +68,21 @@ async function generate(apiKey: string, model: string, prompt: string, maxOutput
 }
 
 async function generateTicketDraft(apiKey: string, model: string, prompt: string): Promise<GeminiTextResponse> {
-  try {
-    return await generate(apiKey, model, prompt, 700, { timeoutMs: 12_000, retries: 0 });
-  } catch (error) {
-    // Older/stale dashboard records can contain a model that is no longer
-    // available. Keep drafting usable without requiring an admin to replace
-    // the API key: retry once with the stable fallback model.
-    const failure = classifyGeminiFailure(error);
-    if ((failure.code === "model" || failure.code === "invalid_request") && model !== "gemini-2.5-flash") {
-      return generate(apiKey, "gemini-2.5-flash", prompt, 700, { timeoutMs: 12_000, retries: 0 });
+  // Prefer the enabled, unused fast model shown in the project quota screen.
+  // A stale model saved in the dashboard must not make every ticket draft
+  // wait until it times out.
+  const models = [...new Set(["gemini-2.5-flash", "gemini-3.5-flash-lite", model])].slice(0, 2);
+  let lastError: unknown;
+  for (const candidate of models) {
+    try {
+      return await generate(apiKey, candidate, prompt, 700, { timeoutMs: 10_000, retries: 0 });
+    } catch (error) {
+      lastError = error;
+      const failure = classifyGeminiFailure(error);
+      if (!["model", "invalid_request", "timeout", "provider"].includes(failure.code)) throw error;
     }
-    throw error;
   }
+  throw lastError instanceof Error ? lastError : new GeminiRequestError("provider", "Gemini did not return a response");
 }
 
 export async function testGeminiConnection(apiKey?: string, model?: string): Promise<void> {
