@@ -153,7 +153,7 @@ export default async function TicketPage({ params }: { params: { id: string } })
             </section>
 
             <section className="card">
-              <details className="fold" open={staff}>
+              <details className="fold">
                 <summary><span className="section-title" style={{ margin: 0 }}><History size={18} aria-hidden /> History <span className="hint">({eventList.length})</span></span></summary>
                 <ol className="timeline">
                   {eventList.map((e) => (
