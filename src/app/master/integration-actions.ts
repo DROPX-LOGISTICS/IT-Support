@@ -14,6 +14,14 @@ import { requireUser } from "@/lib/session";
 
 const str = (fd: FormData, key: string) => String(fd.get(key) ?? "").trim();
 const providerOf = (value: string): IntegrationProvider | null => value === "google" || value === "github" ? value : null;
+function githubErrorMessage(error: unknown): string {
+  const detail = error instanceof Error ? error.message.toLowerCase() : "";
+  if (/401|bad credentials|requires authentication/.test(detail)) return "GitHub rejected the saved OAuth token. Reconnect GitHub and approve repository access again.";
+  if (/403|rate limit|resource not accessible|sso/.test(detail)) return "GitHub denied this request. Check token permissions, organisation SSO approval, or GitHub rate limits, then reconnect GitHub.";
+  if (/429/.test(detail)) return "GitHub rate limit reached. Wait briefly, then test again.";
+  if (/timeout|abort/.test(detail)) return "GitHub did not respond in time. Retry the connection test.";
+  return "GitHub connection test failed. Reconnect GitHub and approve repository access again.";
+}
 async function admin() {
   const session = await requireUser();
   if (session.state !== "ok" || !canManageMaster({ id: session.user.id, role: session.user.role, isActive: true })) redirect("/my-tickets");
@@ -70,12 +78,15 @@ export async function testIntegrationAction(fd: FormData) {
       const token = await runtimeGithubToken();
       if (!token) throw new Error("No connected account");
       const res = await fetch("https://api.github.com/user", { headers: { authorization: `Bearer ${token}`, accept: "application/json", "user-agent": "dropx-it-support" }, cache: "no-store", signal: AbortSignal.timeout(12_000) });
-      if (!res.ok) throw new Error(`Provider returned ${res.status}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { message?: string };
+        throw new Error(`GitHub returned ${res.status}: ${body.message ?? "provider rejected the request"}`);
+      }
     }
     await noteIntegrationCheck(provider);
   } catch (e) {
     error = true;
-    errorMessage = provider === "google" ? sheetsErrorMessage(e) : "Connection test failed. Reconnect the account and try again.";
+    errorMessage = provider === "google" ? sheetsErrorMessage(e) : githubErrorMessage(e);
     await noteIntegrationCheck(provider, errorMessage);
   }
   done(!error, error ? errorMessage : `${provider === "google" ? "Google Workspace" : "GitHub"} connection is healthy.`);

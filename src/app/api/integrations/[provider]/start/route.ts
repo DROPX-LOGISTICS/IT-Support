@@ -12,10 +12,9 @@ export async function GET(request: NextRequest, { params }: { params: { provider
   if (!provider || session.state !== "ok" || session.user.role !== "admin") return NextResponse.redirect(new URL("/login", request.url));
   const app = await oauthApp(provider);
   if (!app) return NextResponse.redirect(new URL("/master?tab=integrations&error=Save+the+OAuth+app+details+first.", request.url));
-  // A reconnect must not silently reuse a refresh token that was minted before
-  // Sheets/Drive scopes were added. Keep the OAuth app, clear only the account,
-  // and require Google to issue a fresh grant.
-  if (provider === "google" && request.nextUrl.searchParams.get("force") === "1") await disconnectIntegration("google");
+  // A reconnect must not silently reuse an old provider token. Keep the OAuth
+  // app, clear only the account, and require a fresh grant.
+  if (request.nextUrl.searchParams.get("force") === "1") await disconnectIntegration(provider);
   const state = randomToken(), verifier = randomToken(48), challenge = await pkceChallenge(verifier);
   const callback = oauthCallback(provider, request.nextUrl.origin);
   const url = provider === "google" ? new URL("https://accounts.google.com/o/oauth2/v2/auth") : new URL("https://github.com/login/oauth/authorize");

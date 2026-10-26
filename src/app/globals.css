@@ -187,6 +187,8 @@ input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--brand); ve
   .pulse-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 16%, transparent); animation: pulse-dot 1.4s ease-in-out infinite; }
   @keyframes pulse-dot { 50% { opacity: .45; transform: scale(.8); } }
   .btn:disabled { cursor: wait; opacity: .72; }
+  .integration-links { display: inline-flex; flex-wrap: wrap; gap: 8px; margin-left: 4px; }
+  .integration-links a { color: inherit; font-weight: 700; text-decoration: underline; }
 
 /* ---------- Feedback ---------- */
 .banner { display: flex; gap: 8px; align-items: flex-start; border-radius: 9px; padding: 8px 10px; margin-bottom: 11px; font-size: 13px; border: 1px solid transparent; }
