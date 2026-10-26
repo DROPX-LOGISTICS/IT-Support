@@ -13,6 +13,12 @@ export type MailTicket = {
 };
 export type MailExtra = { reason?: string; commentBody?: string; commentAuthor?: string; assigneeName?: string };
 
+/** One stable subject is required for Gmail to keep every ticket update in one conversation. */
+export function ticketSubject(t: Pick<MailTicket, "number" | "title">): string {
+  const title = t.title.replace(/[\r\n]+/g, " ").trim();
+  return `[${t.number}] ${title}`.slice(0, 180);
+}
+
 const TYPE_WORD: Record<string, string> = { bug: "bug", feature: "feature request", support: "support request" };
 const when = (iso: string | null) => (iso ? `${new Date(iso).toLocaleString("en-IN", { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone: "Asia/Kolkata" })} IST` : "");
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);

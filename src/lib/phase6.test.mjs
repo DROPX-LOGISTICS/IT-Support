@@ -6,7 +6,7 @@ import { DEFAULT_TARGETS, overdueInfo, parseTargets, validateSettingsInput } fro
 import { buildSummary, weekStartIst } from "./summary.ts";
 import { selectAutoClose, selectReminders } from "./maintenance.ts";
 import { isAuthorizedCron } from "./cron-auth.ts";
-import { buildEmail, MAIL_KINDS, recipientsFor } from "./email-content.ts";
+import { buildEmail, MAIL_KINDS, recipientsFor, ticketSubject } from "./email-content.ts";
 import { clearGoogleTokenCache, googleAccessToken, signJwtRs256, serviceAccountFromEnv } from "./google-auth.ts";
 import { buildEventBody, calendarStatus, cancelEvent, createMeetEvent, rescheduleEvent, calendarErrorMessage, GoogleApiError } from "./google-calendar.ts";
 import { createSheetExport, sheetsErrorMessage, sheetsStatus } from "./google-sheets.ts";
@@ -226,6 +226,11 @@ test("calendar errors become short safe messages", () => {
   assert.match(calendarErrorMessage(new GoogleApiError("secret detail", 403)), /access is missing/);
   assert.ok(!calendarErrorMessage(new GoogleApiError("secret detail", 500)).includes("secret"));
   assert.match(calendarErrorMessage(new Error("Google Workspace refused the delegated access")), /not set up/);
+});
+test("every lifecycle email uses one stable Gmail subject per ticket", () => {
+  const subject = ticketSubject(ticket);
+  assert.equal(subject, "[BUG-012] Payout <b>page</b> blank");
+  assert.equal(new Set(MAIL_KINDS.map(() => ticketSubject(ticket))).size, 1);
 });
 test("sheet errors identify Sheets access without leaking provider details", () => {
   assert.match(sheetsErrorMessage(new GoogleApiError("secret detail", 403)), /Sheets or Drive access is missing/);

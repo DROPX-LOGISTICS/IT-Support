@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { appUrl } from "./config.ts";
-import { buildEmail, recipientsFor, type MailExtra, type MailKind, type MailTicket } from "./email-content.ts";
+import { buildEmail, recipientsFor, ticketSubject, type MailExtra, type MailKind, type MailTicket } from "./email-content.ts";
 import { sendMail } from "./mail/index.ts";
 import { serviceClient } from "./supabase/admin.ts";
 
@@ -45,7 +45,7 @@ export async function notify(ticketId: string, kind: MailKind, opts: NotifyOpts 
     const db = serviceClient();
     if (!db) return false;
     const { data: t } = await db.from("support_tickets")
-      .select("id,number,title,type,priority,status,developer_update,viable_reason,expected_date,meet_link,meet_at,reporter_id,reporter_name,reporter_email,assignee_id,portal:support_portals(name)")
+      .select("id,number,title,type,priority,status,developer_update,viable_reason,expected_date,meet_link,meet_at,reporter_id,reporter_name,reporter_email,assignee_id,email_thread_id,email_message_id,portal:support_portals(name)")
       .eq("id", ticketId).maybeSingle<Row>();
     if (!t) return false;
     if (!opts.ignoreSwitches) {
@@ -64,10 +64,18 @@ export async function notify(ticketId: string, kind: MailKind, opts: NotifyOpts 
       id: t.id, number: t.number, title: t.title, type: t.type, priority: t.priority, portal: t.portal?.name ?? "a portal", reporterName: t.reporter_name,
       developerUpdate: t.developer_update, viableReason: t.viable_reason, expectedDate: t.expected_date, meetLink: t.meet_link, meetAt: t.meet_at, status: t.status,
     };
-    const { subject, content } = buildEmail(kind, mt, `${appUrl()}/tickets/${t.id}`, opts.extra);
+    const { content } = buildEmail(kind, mt, `${appUrl()}/tickets/${t.id}`, opts.extra);
+    const subject = ticketSubject(mt);
     const { data: previousEmail } = await db.from("support_events").select("reason").eq("ticket_id", t.id).eq("event_type", "email_sent").order("created_at", { ascending: false }).limit(1).maybeSingle<{ reason: string | null }>();
     const previousThread = decodeThread(t.email_thread_id && t.email_message_id ? encodeThread({ threadId: t.email_thread_id, messageId: t.email_message_id }) : previousEmail?.reason);
     const res = await sendMail(to, subject, content, previousThread ?? {});
+    if (res.ok) {
+      // Persist the first Gmail conversation identity on the ticket itself.
+      // History remains the recovery path for tickets created before this field
+      // was populated, while this prevents later lifecycle updates from
+      // starting a fresh conversation.
+      await db.from("support_tickets").update({ email_thread_id: res.threadId, email_message_id: res.messageId }).eq("id", t.id);
+    }
     await record(db, t.id, kind, res.ok, res.ok ? undefined : res.reason === "not_configured" ? res.detail ?? "email is not configured" : res.detail ?? "send failed", res.ok ? res : undefined);
     return res.ok;
   } catch {
