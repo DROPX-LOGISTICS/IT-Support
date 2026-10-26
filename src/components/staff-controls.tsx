@@ -24,6 +24,7 @@ export function StatusForm(props: { ticketId: string; status: Status; options: S
   const [aiState, aiAction] = useFormState(draftTicketText, initial);
   const [to, setTo] = useState<string>(props.options[0] ?? "");
   const [update, setUpdate] = useState("");
+  useEffect(() => { if (aiState.draft) setUpdate(aiState.draft); }, [aiState.draft]);
   if (!props.options.length) return <p className="muted" style={{ margin: 0 }}>No status changes are available from “{props.status}”.</p>;
   const needsReason = to === "Blocked" || to === "Not viable";
   return (
