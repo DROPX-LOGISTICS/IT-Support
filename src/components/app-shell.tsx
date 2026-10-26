@@ -7,9 +7,11 @@ import { userClient } from "@/lib/supabase/server";
 import { DONE } from "@/lib/status-flow";
 import { Avatar, Logo } from "./ui";
 import { MobileMenu, NavLinks, TabBar, type NavCounts } from "./nav-links";
+import { ViewAsUserButton } from "./view-as-user";
 
 type Width = "narrow" | "mid" | "wide";
 type ShellUser = Pick<SessionUser, "id" | "name" | "email" | "role">;
+type ViewUser = { id: string; name: string; email: string; role: string; is_active: boolean };
 
 function UserCard({ user }: { user: ShellUser }) {
   return (
@@ -22,7 +24,7 @@ function UserCard({ user }: { user: ShellUser }) {
 }
 
 /** The frame around every signed-in page: sidebar on a computer, top bar and bottom bar on a phone. */
-export function ShellFrame({ user, counts, width = "narrow", children }: { user: ShellUser; counts: NavCounts; width?: Width; children: React.ReactNode }) {
+export function ShellFrame({ user, counts, viewUsers = [], width = "narrow", children }: { user: ShellUser; counts: NavCounts; viewUsers?: ViewUser[]; width?: Width; children: React.ReactNode }) {
   return (
     <div className="app">
       <aside className="side">
@@ -39,6 +41,7 @@ export function ShellFrame({ user, counts, width = "narrow", children }: { user:
         <header className="topbar">
           <Link href="/" aria-label="DropX IT Support, home"><Logo /></Link>
           <span className="spacer" />
+          {user.role === "admin" && <ViewAsUserButton users={viewUsers} />}
           <Link className="btn sm" href="/new"><PlusCircle size={15} aria-hidden /> Raise</Link>
           <MobileMenu><NavLinks role={user.role} counts={counts} /><UserCard user={user} /></MobileMenu>
         </header>
@@ -66,5 +69,7 @@ async function loadCounts(user: ShellUser): Promise<NavCounts> {
 }
 
 export async function AppShell({ user, width, children }: { user: SessionUser; width?: Width; children: React.ReactNode }) {
-  return <ShellFrame user={user} counts={await loadCounts(user)} width={width}>{children}</ShellFrame>;
+  const supabase = userClient();
+  const viewUsers = user.role === "admin" && supabase ? (await supabase.from("support_users").select("id,name,email,role,is_active").order("name").returns<ViewUser[]>()).data ?? [] : [];
+  return <ShellFrame user={user} counts={await loadCounts(user)} viewUsers={viewUsers} width={width}>{children}</ShellFrame>;
 }

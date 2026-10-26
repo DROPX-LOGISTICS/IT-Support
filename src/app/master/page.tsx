@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { AlertTriangle, CalendarDays, CheckCircle2, ExternalLink, Github, KeyRound, Mail, Pencil, Plug, ShieldCheck, Sparkles, Table2, UserPlus, Eye } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle2, ExternalLink, Github, KeyRound, Mail, Pencil, Plug, ShieldCheck, Sparkles, Table2, UserPlus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { ConfirmSubmitButton } from "@/components/confirm-submit-button";
 import { ConnectionTestButton } from "@/components/connection-test-button";
@@ -48,7 +48,6 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
   const cfg = await loadSettings(supabase);
   const integrations = tab === "integrations" ? await integrationSummaries() : null;
   const staffUsers = U.filter((u) => u.role !== "reporter");
-  const viewedPerson = U.find((u) => u.id === searchParams.view);
   const portalName = (id: string) => P.find((p) => p.id === id)?.name ?? "";
   const Field = ({ label, children, className = "" }: { label: string; children: React.ReactNode; className?: string }) => <div className={className}><label className="field">{label}</label>{children}</div>;
 
@@ -185,11 +184,9 @@ export default async function MasterPage({ searchParams }: { searchParams: { tab
                   {["reporter", "developer", "manager", "admin"].map((r) => <option key={r} value={r}>{r}</option>)}
                 </select>
                 <label className="compact-check"><input type="checkbox" name="active" defaultChecked={u.is_active} disabled={u.id === user.id} /> Active</label>
-                <Link className="btn ghost sm" href={`/master?tab=people&view=${u.id}`}><Eye size={14} aria-hidden /> View</Link>
                 <button className="btn sm" type="submit" disabled={u.id === user.id}>{u.id === user.id ? "You" : "Save"}</button>
               </form>
             ))}
-            {viewedPerson && <section className="card person-view"><div className="section-title"><Eye size={16} aria-hidden /> User details</div><div className="person-view-grid"><div><span className="field">Name</span><strong>{viewedPerson.name || "Not set"}</strong></div><div><span className="field">Email</span><strong>{viewedPerson.email}</strong></div><div><span className="field">Role</span><strong>{viewedPerson.role}</strong></div><div><span className="field">Account status</span><strong>{viewedPerson.is_active ? "Active" : "Disabled"}</strong></div></div></section>}
           </div>
         )}
 
