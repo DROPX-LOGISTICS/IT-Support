@@ -5,7 +5,11 @@ export const metadata: Metadata = {
   title: { default: "DropX IT Support", template: "%s · DropX IT Support" },
   description: "Report a problem or ask for a feature.",
   applicationName: "DropX IT Support",
-  icons: { icon: "/favicon.png", shortcut: "/favicon.png" },
+  icons: {
+    icon: [{ url: "/it-support-favicon.svg", type: "image/svg+xml" }],
+    shortcut: "/it-support-favicon.svg",
+    apple: "/it-support-favicon.svg",
+  },
 };
 export const viewport: Viewport = {
   width: "device-width", initialScale: 1, viewportFit: "cover",
