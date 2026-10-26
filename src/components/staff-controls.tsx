@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import { changeStatus, saveDetails, type ActionResult } from "@/app/tickets/actions";
@@ -7,9 +7,9 @@ import { PRIORITIES, PRIORITY_LABEL, type Priority, type Status, type TicketType
 import { DONE } from "@/lib/status-flow";
 
 const initial: ActionResult = { ok: false, message: "" };
-function Submit({ children }: { children: React.ReactNode }) {
+function Submit({ children, disabled = false }: { children: React.ReactNode; disabled?: boolean }) {
   const { pending } = useFormStatus();
-  return <button className="btn" type="submit" disabled={pending}>{pending && <Loader2 size={16} className="spin" aria-hidden />}{children}</button>;
+  return <button className="btn" type="submit" disabled={pending || disabled}>{pending && <Loader2 size={16} className="spin" aria-hidden />}{children}</button>;
 }
 const Msg = ({ s }: { s: ActionResult }) => (s.message ? <div className={s.ok ? "ok-text" : "err"} role="status">{s.message}</div> : null);
 
@@ -51,8 +51,19 @@ export function DetailsForm(props: {
   developers: { id: string; name: string }[];
 }) {
   const [state, action] = useFormState(saveDetails, initial);
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => { if (state.ok) setDirty(false); }, [state]);
+  const checkDirty = (event: React.FormEvent<HTMLFormElement>) => {
+    const data = new FormData(event.currentTarget);
+    const same = (name: string, original: string) => String(data.get(name) ?? "") === original;
+    const unchanged = same("assignee", props.assigneeId ?? "") && same("priority", props.priority)
+      && same("expectedDate", props.expectedDate ?? "") && same("developerUpdate", props.developerUpdate ?? "")
+      && same("links", props.links.join("\n"))
+      && (props.type !== "feature" || (same("viable", props.viable ?? "") && same("viableReason", props.viableReason ?? "")));
+    setDirty(!unchanged);
+  };
   return (
-    <form action={action} className="stack" style={{ ["--gap" as string]: "14px" }}>
+    <form action={action} onInput={checkDirty} onChange={checkDirty} className="stack" style={{ ["--gap" as string]: "14px" }}>
       <input type="hidden" name="ticketId" value={props.ticketId} />
       <div className="grid2">
         <div>
@@ -95,7 +106,7 @@ export function DetailsForm(props: {
         <label className="field" htmlFor="links">Links <span className="hint">(commit, pull request, page; one per line)</span></label>
         <textarea id="links" name="links" defaultValue={props.links.join("\n")} style={{ minHeight: 60 }} />
       </div>
-      <div className="actions" style={{ justifyContent: "space-between" }}><Msg s={state} /><Submit>Save changes</Submit></div>
+      <div className="actions" style={{ justifyContent: "space-between" }}><Msg s={state} /><Submit disabled={!dirty}>Save changes</Submit></div>
     </form>
   );
 }
