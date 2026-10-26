@@ -241,6 +241,13 @@ export async function githubRuntimeConfigured() { return Boolean(await runtimeGi
 export async function googleOAuthConnected() { return Boolean((await readIntegration("google"))?.refreshToken || envGoogleRecord()); }
 export async function runtimeGoogleAccessToken(scopes: string[], subject: string, deps: AuthDeps = {}) {
   const env = deps.env ?? process.env;
+  // A dashboard OAuth connection is the user's actual Google grant. Prefer it
+  // when present so Drive folders and delegated/service-account credentials do
+  // not get mixed up during connection tests or exports.
+  if (!deps.env) {
+    const oauthToken = await googleOAuthAccessToken();
+    if (oauthToken) return oauthToken;
+  }
   if (googleCredentialsConfigured(env)) return googleAccessToken(scopes, subject, deps);
   // Explicit dependency injection belongs to tests and must not silently fall through to live KV credentials.
   if (deps.env) throw new Error("Google credentials are not configured");

@@ -68,7 +68,7 @@ export async function testIntegrationAction(fd: FormData) {
       const granted = new Set(String(tokenData.scope ?? "").split(/[ ,]+/).filter(Boolean));
       const requiredGoogleScopes = GOOGLE_SCOPES.filter((scope) => scope.startsWith("https://www.googleapis.com/auth/"));
       const missingScopes = requiredGoogleScopes.filter((scope) => !granted.has(scope));
-      if (missingScopes.length) throw new GoogleApiError("OAuth token has insufficient authentication scopes", 403);
+      if (missingScopes.length) throw new GoogleApiError(`OAuth token is missing OAuth scopes: ${missingScopes.join(", ")}`, 403);
       const res = await fetch("https://www.googleapis.com/drive/v3/files?pageSize=1&spaces=drive&fields=files(id)", {
         headers: { authorization: `Bearer ${token}`, accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(12_000),
       });

@@ -3,7 +3,10 @@ import { isValidAddress } from "./mail/message.ts";
 import { GoogleApiError } from "./google-calendar.ts";
 import { integrationSummaries, runtimeGoogleAccessToken } from "./integrations.ts";
 
-export const SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive.file"];
+// The attachment folder is an existing Drive folder owned by the connected
+// mailbox. drive.file cannot reliably write to an existing folder created
+// outside this OAuth app, so the OAuth grant must include full Drive access.
+export const SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"];
 
 export function sheetsStatus(env: Env = process.env): { configured: true; owner: string } | { configured: false; missing: string[] } {
   const owner = (env.GOOGLE_SHEETS_OWNER ?? env.GOOGLE_CALENDAR_ORGANIZER)?.trim();
@@ -24,6 +27,10 @@ export async function sheetsRuntimeStatus(): Promise<{ configured: true; owner: 
 export function sheetsErrorMessage(e: unknown): string {
   if (e instanceof GoogleApiError) {
     const detail = e.message.toLowerCase();
+    if (/missing oauth scopes?:.*gmail\.send/.test(detail)) return "Google OAuth is missing Gmail send permission. Reconnect Google and approve Gmail access.";
+    if (/missing oauth scopes?:.*calendar\.events/.test(detail)) return "Google OAuth is missing Calendar permission. Reconnect Google and approve Calendar access.";
+    if (/missing oauth scopes?:.*drive(?:\.file)?/.test(detail)) return "Google OAuth is missing Drive permission. Reconnect Google and approve Drive access for attachments and exports.";
+    if (/missing oauth scopes?:.*spreadsheets/.test(detail)) return "Google OAuth is missing Sheets permission. Reconnect Google and approve Sheets access for exports.";
     if (/insufficient authentication scope|insufficient permission|missing.*(spreadsheet|drive).*scope/.test(detail)) return "The Google OAuth grant is missing Sheets or Drive permission. Use Reconnect Google, approve every requested permission, then test again.";
     if (/gmail/.test(detail) && (e.status === 401 || e.status === 403)) return "Gmail API or Gmail send permission is missing. Enable Gmail API, reconnect Google, and grant Gmail send access.";
     if (/service_disabled|has not been used in project|api.*disabled|accessnotconfigured/.test(detail)) return "Enable both Google Sheets API and Google Drive API in the Google Cloud project used by this OAuth app, then reconnect Google.";
